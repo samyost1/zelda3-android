@@ -44,6 +44,11 @@ public class SecondScreenPresentation extends Presentation {
         setContentView(minimap);
     }
 
+    /** Prevent dismissing the second screen with Back button and gesture. */
+    @Override
+    public void onBackPressed() {
+    }
+
     /** Debug: render the current view into a PNG (triggered via adb broadcast). */
     public void dumpToFile(File file) {
         if (minimap == null || minimap.getWidth() == 0) return;
