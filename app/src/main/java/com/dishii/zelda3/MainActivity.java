@@ -125,7 +125,7 @@ public class MainActivity extends SDLActivity {
     public void setOrientationBis(int w, int h, boolean resizable, String hint) {
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
     }
-    
+
     // Show the companion Presentation on the first non-default display
     // (the Ayn Thor's bottom screen, or an emulator's simulated display).
     private void showSecondScreenIfPresent() {
