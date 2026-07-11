@@ -32,6 +32,13 @@ void SS_ReadSram(uint8_t *out, int n);
 int  SS_GetEquippedSlot(void);
 int  SS_GetDungeon(void);
 void SS_ReadDungFlags(uint8_t *out, int n);
+int  SS_AchCount(void);
+const char *SS_AchName(int id);
+int  SS_AchProgress(int id, int *max);
+const char *SS_AchDesc(int id);
+void SS_SetFeature(unsigned mask, bool on);
+bool SS_GetFeature(unsigned mask);
+int  SS_AchUnlockedCount(void);
 bool SS_RenderIconSheet(uint32_t *px);
 bool SS_RenderGlyphSheet(uint32_t *px);
 bool SS_RenderLetterSheet(uint32_t *px);
@@ -70,6 +77,12 @@ enum {
 };
 
 enum { TAB_MAP, TAB_ITEMS, TAB_GEAR, TAB_SETTINGS };
+// zelda3 feature bits (see features.h) toggled from the settings panel
+enum {
+  FEAT_DISABLE_LOW_HEALTH_BEEP = 64,
+  FEAT_TURN_WHILE_DASHING = 4,
+  FEAT_MIRROR_TO_DARKWORLD = 8,
+};
 enum { MODE_GAME, MODE_TITLE, MODE_CINEMA };
 
 typedef struct { float x, y, w, h; } RectFS;
@@ -156,11 +169,24 @@ static void rebuild_renderer(int w2, int h2);
 static bool ss_needs_rebuild;
 
 // touch rects recomputed every draw, used by the tap handler
-static RectFS map_area_r, tab_items_r, tab_gear_r, tab_settings_r, y_ring_r;
-static RectFS settings_row_r[3], remap_row_r[12], remap_back_r;
+static RectFS map_area_r, tab_items_r, tab_gear_r, tab_map_r, tab_settings_r, y_ring_r;
+static RectFS settings_row_r[7], remap_row_r[12], remap_back_r;
+static RectFS ach_back_r;
 
 // settings / remap state
 static bool remap_mode;
+static bool ach_mode;               // achievements sub-panel open
+static float ach_scroll, ach_scroll_max;
+static bool  ach_drag;
+static float ach_drag_y, ach_down_x, ach_down_y;
+static bool  ach_moved;
+static RectFS ach_row_r[32];            // per-row hit rects (filled while drawing)
+static int   ach_sel = -1;              // open detail card, -1 = list
+static int   ach_seen_mask;             // unlocked bitmask for toast edge-detect
+static bool  ach_seeded;
+static int   toast_q[32], toast_qn;     // queued achievement ids
+static int   toast_id = -1;
+static uint32_t toast_at;
 static int  remap_arm = -1;         // row currently waiting for a button press
 static uint32_t remap_arm_at;
 static int  pad_controls[12];
@@ -898,6 +924,8 @@ static void leave_remap(void) {
   if (remap_arm >= 0) SS_ArmButtonCapture(false);
   remap_arm = -1;
   remap_mode = false;
+  ach_mode = false;
+  ach_sel = -1;
 }
 
 static void draw_cog(float cx, float cy, float r) {
@@ -913,6 +941,191 @@ static void draw_settings_row(RectFS *row, bool armed) {
   fill_round(row->x, row->y, row->w, row->h, 8 * u, armed ? COL_GOLD : COL_GOLD_DARK);
   fill_round(row->x + 3 * u, row->y + 3 * u, row->w - 6 * u, row->h - 6 * u, 6 * u,
              armed ? COL(58, 48, 12) : COL(28, 28, 28));
+}
+
+static void draw_check(float cx, float cy, float s, uint32_t col) {
+  for (float d = 0; d < s * 0.45f; d += 1.0f)
+    fill_rect(cx - s * 0.4f + d, cy + d, 2.4f * u, 2.4f * u, col);
+  for (float d = 0; d < s * 0.8f; d += 1.0f)
+    fill_rect(cx + d, cy + s * 0.45f - d, 2.4f * u, 2.4f * u, col);
+}
+
+static void ach_scroll_drag(float y) {
+  ach_scroll -= (y - ach_drag_y);
+  ach_drag_y = y;
+  if (ach_scroll > ach_scroll_max) ach_scroll = ach_scroll_max;
+  if (ach_scroll < 0) ach_scroll = 0;
+}
+
+// Wrap s into up to maxlines lines that fit maxw at scale sc; returns the count.
+static int wrap_text(const char *s, float maxw, float sc, char out[][32], int maxlines) {
+  int n = 0;
+  char cur[32] = {0}, word[32];
+  const char *p = s;
+  while (*p && n < maxlines) {
+    while (*p == ' ') p++;
+    int wl = 0;
+    while (*p && *p != ' ' && wl < 31) word[wl++] = *p++;
+    word[wl] = 0;
+    if (!wl) break;
+    char trial[64];
+    if (cur[0]) snprintf(trial, sizeof trial, "%s %s", cur, word);
+    else        snprintf(trial, sizeof trial, "%s", word);
+    if (cur[0] && text_width(trial, sc) > maxw) {
+      snprintf(out[n++], 32, "%.31s", cur);
+      snprintf(cur, sizeof cur, "%.31s", word);
+    } else {
+      snprintf(cur, sizeof cur, "%.31s", trial);
+    }
+  }
+  if (cur[0] && n < maxlines) snprintf(out[n++], 32, "%.31s", cur);
+  return n ? n : 1;
+}
+
+static void draw_ach_panel(RectFS r) {
+  int total = SS_AchCount(), done = SS_AchUnlockedCount();
+  ach_back_r = (RectFS){r.x + 20 * u, r.y + 12 * u, 90 * u, 38 * u};
+  draw_settings_row(&ach_back_r, false);
+  draw_text("BACK", ach_back_r.x + ach_back_r.w / 2 - text_width("BACK", 2.2f * u) / 2,
+            ach_back_r.y + ach_back_r.h / 2 - 9 * u, 2.2f * u);
+  char hdr[48];
+  snprintf(hdr, sizeof hdr, "ACHIEVEMENTS %d OF %d", done, total);
+  draw_text(hdr, ach_back_r.x + ach_back_r.w + 18 * u, ach_back_r.y + ach_back_r.h / 2 - 11 * u, 2.6f * u);
+
+  // Single-column scrollable list; each row grows to fit its wrapped name.
+  float list_x = r.x + 20 * u, list_w = r.w - 40 * u;
+  float list_top = r.y + 60 * u, list_bot = r.y + r.h - 14 * u;
+  float view_h = list_bot - list_top;
+  SDL_Rect clip = {(int)list_x, (int)list_top, (int)list_w, (int)view_h};
+  SDL_RenderSetClipRect(ss_r, &clip);
+
+  float sc = 2.2f * u, line_h = 18 * u, gap = 8 * u, box = 24 * u;
+  float text_x = list_x + 14 * u + box + 10 * u;
+  float name_w = (list_x + list_w - 100 * u) - text_x;
+  if (name_w < 40 * u) name_w = 40 * u;
+
+  float y = list_top - ach_scroll;
+  for (int id = 0; id < total; id++) {
+    int mx = 1, cur = SS_AchProgress(id, &mx);
+    bool unlocked = cur >= mx;
+    char lines[3][32];
+    int nl = wrap_text(SS_AchName(id), name_w, sc, lines, 3);
+    float row_h = nl * line_h + 16 * u;
+    if (row_h < box + 14 * u) row_h = box + 14 * u;
+    if (id < 32) ach_row_r[id] = (RectFS){list_x, y, list_w, row_h};
+
+    if (y + row_h >= list_top && y <= list_bot) {   // cull off-screen rows
+      fill_round(list_x, y, list_w, row_h, 7 * u, unlocked ? COL_GOLD : COL(46, 46, 46));
+      fill_round(list_x + 2.5f * u, y + 2.5f * u, list_w - 5 * u, row_h - 5 * u, 5 * u,
+                 unlocked ? COL(44, 36, 10) : COL(22, 22, 22));
+      float bx = list_x + 14 * u, by = y + (row_h - box) / 2;
+      fill_round(bx, by, box, box, 4 * u, unlocked ? COL_GOLD_DARK : COL(60, 60, 60));
+      if (unlocked) draw_check(bx + box * 0.5f, by + box * 0.28f, box * 0.6f, COL_GOLD);
+      float ty = y + (row_h - nl * line_h) / 2;
+      for (int i = 0; i < nl; i++)
+        draw_text(lines[i], text_x, ty + i * line_h, sc);
+      if (mx > 1 && !unlocked) {
+        char pv[16];
+        snprintf(pv, sizeof pv, "%d OF %d", cur, mx);
+        draw_text(pv, list_x + list_w - 14 * u - text_width(pv, 2 * u), y + row_h / 2 - 7 * u, 2 * u);
+      }
+    }
+    y += row_h + gap;
+  }
+  SDL_RenderSetClipRect(ss_r, NULL);
+
+  float content_h = y + ach_scroll - list_top;
+  ach_scroll_max = content_h - view_h;
+  if (ach_scroll_max < 0) ach_scroll_max = 0;
+  if (ach_scroll > ach_scroll_max) ach_scroll = ach_scroll_max;
+
+  if (ach_scroll_max > 0) {   // scrollbar hint
+    float th = view_h * view_h / content_h;
+    if (th < 24 * u) th = 24 * u;
+    float ty = list_top + (view_h - th) * (ach_scroll / ach_scroll_max);
+    fill_round(list_x + list_w - 5 * u, ty, 4 * u, th, 2 * u, COL_GOLD_DARK);
+  }
+}
+
+static void ach_open_row(float x, float y) {
+  for (int i = 0; i < SS_AchCount() && i < 32; i++)
+    if (in_rect(&ach_row_r[i], x, y)) { ach_sel = i; return; }
+}
+
+// Modal card for the selected achievement: badge, name, wrapped description,
+// status. Dismissed by tapping anywhere.
+static void draw_ach_detail(RectFS r) {
+  int id = ach_sel, mx = 1, cur = SS_AchProgress(id, &mx);
+  bool unlocked = cur >= mx;
+
+  SDL_SetRenderDrawBlendMode(ss_r, SDL_BLENDMODE_BLEND);
+  set_color(0xB0000000u);
+  SDL_FRect dim = {r.x, r.y, r.w, r.h};
+  SDL_RenderFillRectF(ss_r, &dim);
+  SDL_SetRenderDrawBlendMode(ss_r, SDL_BLENDMODE_NONE);
+
+  float cw = r.w * 0.82f, ch = r.h * 0.68f;
+  float cx = r.x + (r.w - cw) / 2, cy = r.y + (r.h - ch) / 2;
+  fill_round(cx, cy, cw, ch, 12 * u, unlocked ? COL_GOLD : COL_BOX_BORDER2);
+  fill_round(cx + 4 * u, cy + 4 * u, cw - 8 * u, ch - 8 * u, 9 * u, COL(20, 20, 20));
+
+  float box = 40 * u, bx = cx + cw / 2 - box / 2, by = cy + 22 * u;
+  fill_round(bx, by, box, box, 6 * u, unlocked ? COL_GOLD_DARK : COL(60, 60, 60));
+  if (unlocked) draw_check(bx + box * 0.5f, by + box * 0.28f, box * 0.6f, COL_GOLD);
+
+  const char *nm = SS_AchName(id);
+  draw_text(nm, cx + cw / 2 - text_width(nm, 3 * u) / 2, by + box + 16 * u, 3 * u);
+
+  char lines[4][32];
+  int nl = wrap_text(SS_AchDesc(id), cw - 44 * u, 2.2f * u, lines, 4);
+  float dy = by + box + 58 * u;
+  for (int i = 0; i < nl; i++)
+    draw_text(lines[i], cx + cw / 2 - text_width(lines[i], 2.2f * u) / 2, dy + i * 22 * u, 2.2f * u);
+
+  char st[24];
+  if (unlocked)   snprintf(st, sizeof st, "UNLOCKED");
+  else if (mx > 1) snprintf(st, sizeof st, "%d OF %d", cur, mx);
+  else            snprintf(st, sizeof st, "LOCKED");
+  draw_text(st, cx + cw / 2 - text_width(st, 2.4f * u) / 2, cy + ch - 60 * u, 2.4f * u);
+  draw_text("TAP TO CLOSE", cx + cw / 2 - text_width("TAP TO CLOSE", 2 * u) / 2, cy + ch - 34 * u, 2 * u);
+}
+
+// Watch for freshly-earned achievements. Seeds silently the first playing frame
+// so a loaded save doesn't dump a toast for everything already done; reseeds at
+// the title so loading a different save re-baselines.
+static void ss_poll_ach(int module) {
+  if (module <= 0x05) { ach_seeded = false; return; }   // title / file select
+  int cur = 0, m, n = SS_AchCount();
+  for (int i = 0; i < n && i < 32; i++)
+    if (SS_AchProgress(i, &m) >= m) cur |= (1 << i);
+  if (!ach_seeded) { ach_seen_mask = cur; ach_seeded = true; return; }
+  int newly = cur & ~ach_seen_mask;
+  ach_seen_mask = cur;
+  for (int i = 0; i < n && newly; i++)
+    if (newly & (1 << i)) { if (toast_qn < 32) toast_q[toast_qn++] = i; newly &= ~(1 << i); }
+}
+
+static void draw_toasts(void) {
+  uint32_t now = SDL_GetTicks();
+  if (toast_id < 0 && toast_qn > 0) {
+    toast_id = toast_q[0];
+    for (int i = 1; i < toast_qn; i++) toast_q[i - 1] = toast_q[i];
+    toast_qn--;
+    toast_at = now;
+  }
+  if (toast_id < 0) return;
+  uint32_t el = now - toast_at;
+  const uint32_t DUR = 3200, ANIM = 280;
+  if (el > DUR) { toast_id = -1; return; }
+  float p = el < ANIM ? (float)el / ANIM : (el > DUR - ANIM ? (float)(DUR - el) / ANIM : 1.0f);
+  if (p < 0) p = 0; if (p > 1) p = 1;
+  float tw = W * 0.6f, th = 66 * u, tx = W / 2 - tw / 2;
+  float ty = -th + (th + 18 * u) * p;
+  fill_round(tx, ty, tw, th, 10 * u, COL_GOLD);
+  fill_round(tx + 3 * u, ty + 3 * u, tw - 6 * u, th - 6 * u, 8 * u, COL(26, 20, 8));
+  draw_text("ACHIEVEMENT UNLOCKED", tx + 18 * u, ty + 12 * u, 2 * u);
+  const char *nm = SS_AchName(toast_id);
+  draw_text(nm, tx + 18 * u, ty + 34 * u, 2.6f * u);
 }
 
 static void draw_remap_panel(RectFS r) {
@@ -962,29 +1175,45 @@ static void draw_settings(RectFS r) {
     draw_remap_panel(r);
     return;
   }
-  draw_text("SETTINGS", r.x + r.w / 2 - text_width("SETTINGS", 3 * u) / 2, r.y + 18 * u, 3 * u);
+  if (ach_mode) {
+    draw_ach_panel(r);
+    return;
+  }
+  draw_text("SETTINGS", r.x + r.w / 2 - text_width("SETTINGS", 2.8f * u) / 2, r.y + 16 * u, 2.8f * u);
 
-  bool ws = SS_IsWidescreen();
-  bool hud_hidden = SS_IsHudHidden();
-  static const char *const labels[3] = {"REMAP BUTTONS", "WIDESCREEN", "TOP SCREEN HUD"};
-  const char *values[3] = {"", ws ? "ON" : "OFF", hud_hidden ? "OFF" : "ON"};
-  float row_h = 76 * u, gap = 18 * u;
-  float y0 = r.y + 60 * u;
-  for (int i = 0; i < 3; i++) {
+  bool beep = !SS_GetFeature(FEAT_DISABLE_LOW_HEALTH_BEEP);
+  static const char *const labels[7] = {
+    "REMAP BUTTONS", "WIDESCREEN", "TOP SCREEN HUD",
+    "LOW HEALTH BEEP", "TURN WHILE DASHING", "MIRROR WARP", "ACHIEVEMENTS",
+  };
+  const char *values[7] = {
+    "", SS_IsWidescreen() ? "ON" : "OFF", SS_IsHudHidden() ? "OFF" : "ON",
+    beep ? "ON" : "OFF",
+    SS_GetFeature(FEAT_TURN_WHILE_DASHING) ? "ON" : "OFF",
+    SS_GetFeature(FEAT_MIRROR_TO_DARKWORLD) ? "ON" : "OFF",
+    "",
+  };
+  const int nrows = 7;
+  float gap = 10 * u, y0 = r.y + 46 * u;
+  float row_h = ((r.y + r.h - 14 * u) - y0 - (nrows - 1) * gap) / nrows;
+  if (row_h > 58 * u) row_h = 58 * u;
+  if (row_h < 32 * u) row_h = 32 * u;
+  float ls = 2.4f * u;
+  for (int i = 0; i < nrows; i++) {
     RectFS *row = &settings_row_r[i];
-    *row = (RectFS){r.x + 28 * u, y0 + i * (row_h + gap), r.w - 56 * u, row_h};
+    *row = (RectFS){r.x + 26 * u, y0 + i * (row_h + gap), r.w - 52 * u, row_h};
     draw_settings_row(row, false);
-    float ty = row->y + row->h / 2 - 12 * u;
-    draw_text(labels[i], row->x + 22 * u, ty, 3 * u);
+    float ty = row->y + row->h / 2 - 9 * u;
+    draw_text(labels[i], row->x + 20 * u, ty, ls);
     if (values[i][0] == 0) {
-      // chevron for the remap sub-screen
-      float ax = row->x + row->w - 40 * u, ay = row->y + row->h / 2;
-      for (float d = 0; d < 14 * u; d += 1.0f) {
-        fill_rect(ax - 8 * u + d, ay - 12 * u + d * 0.857f, 5 * u, 2 * u, COL_GOLD);
-        fill_rect(ax - 8 * u + d, ay + 12 * u - d * 0.857f - 2 * u, 5 * u, 2 * u, COL_GOLD);
+      // chevron for sub-screens (remap / achievements)
+      float ax = row->x + row->w - 32 * u, ay = row->y + row->h / 2;
+      for (float d = 0; d < 12 * u; d += 1.0f) {
+        fill_rect(ax - 7 * u + d, ay - 10 * u + d * 0.857f, 4 * u, 2 * u, COL_GOLD);
+        fill_rect(ax - 7 * u + d, ay + 10 * u - d * 0.857f - 2 * u, 4 * u, 2 * u, COL_GOLD);
       }
     } else {
-      draw_text(values[i], row->x + row->w - 22 * u - text_width(values[i], 3 * u), ty, 3 * u);
+      draw_text(values[i], row->x + row->w - 18 * u - text_width(values[i], ls), ty, ls);
     }
   }
 }
@@ -1005,10 +1234,14 @@ static void draw_tab_bar(float tab_h) {
   float bh = tab_h - 16 * u;
   float sq = bh;   // square settings button on the right
   tab_settings_r = (RectFS){W - 8 * u - sq, y, sq, bh};
-  float half = (W - sq - 10 * u) / 2.0f;
-  tab_gear_r  = (RectFS){8 * u, y, half - 13 * u, bh};
-  tab_items_r = (RectFS){half + 5 * u, y, W - 18 * u - sq - (half + 5 * u), bh};
+  // three equal buttons: GEAR | MAP | ITEMS, left of the settings cog
+  float x0 = 8 * u, xr = tab_settings_r.x - 8 * u, tgap = 8 * u;
+  float bw = (xr - x0 - 2 * tgap) / 3.0f;
+  tab_gear_r  = (RectFS){x0, y, bw, bh};
+  tab_map_r   = (RectFS){x0 + bw + tgap, y, bw, bh};
+  tab_items_r = (RectFS){x0 + 2 * (bw + tgap), y, bw, bh};
   draw_tab_button(tab_gear_r, "GEAR", tab == TAB_GEAR);
+  draw_tab_button(tab_map_r, "MAP", tab == TAB_MAP);
   draw_tab_button(tab_items_r, "ITEMS", tab == TAB_ITEMS);
   draw_tab_button(tab_settings_r, NULL, tab == TAB_SETTINGS);
   draw_cog(tab_settings_r.x + tab_settings_r.w / 2, tab_settings_r.y + tab_settings_r.h / 2,
@@ -1080,6 +1313,7 @@ static void handle_tap(float x, float y) {
   if (mode_for_module(module) != MODE_GAME || !art_ready) return;
 
   if (in_rect(&tab_items_r, x, y)) { tab = (tab == TAB_ITEMS) ? TAB_MAP : TAB_ITEMS; leave_remap(); return; }
+  if (in_rect(&tab_map_r, x, y))   { tab = TAB_MAP; leave_remap(); return; }
   if (in_rect(&tab_gear_r, x, y))  { tab = (tab == TAB_GEAR) ? TAB_MAP : TAB_GEAR; leave_remap(); return; }
   if (in_rect(&tab_settings_r, x, y)) { tab = (tab == TAB_SETTINGS) ? TAB_MAP : TAB_SETTINGS; leave_remap(); return; }
 
@@ -1099,6 +1333,9 @@ static void handle_tap(float x, float y) {
           return;
         }
       }
+    } else if (ach_mode) {
+      if (in_rect(&ach_back_r, x, y)) { ach_mode = false; ach_sel = -1; return; }
+      return;  // list taps/drags are resolved in the event handler
     } else {
       if (in_rect(&settings_row_r[0], x, y)) {
         SS_GetGamepadControls(pad_controls);
@@ -1112,6 +1349,22 @@ static void handle_tap(float x, float y) {
         SS_SetHudHidden(hide);
         if (hide) { FILE *f = fopen(".ss_hidehud", "wb"); if (f) fclose(f); }
         else remove(".ss_hidehud");
+      } else if (in_rect(&settings_row_r[3], x, y)) {
+        bool dis = SS_GetFeature(FEAT_DISABLE_LOW_HEALTH_BEEP);
+        SS_SetFeature(FEAT_DISABLE_LOW_HEALTH_BEEP, !dis);
+        update_ini("[Features]", "DisableLowHealthBeep", !dis ? "1" : "0");
+      } else if (in_rect(&settings_row_r[4], x, y)) {
+        bool on = SS_GetFeature(FEAT_TURN_WHILE_DASHING);
+        SS_SetFeature(FEAT_TURN_WHILE_DASHING, !on);
+        update_ini("[Features]", "TurnWhileDashing", !on ? "1" : "0");
+      } else if (in_rect(&settings_row_r[5], x, y)) {
+        bool on = SS_GetFeature(FEAT_MIRROR_TO_DARKWORLD);
+        SS_SetFeature(FEAT_MIRROR_TO_DARKWORLD, !on);
+        update_ini("[Features]", "MirrorToDarkworld", !on ? "1" : "0");
+      } else if (in_rect(&settings_row_r[6], x, y)) {
+        ach_mode = true;
+        ach_scroll = 0;
+        ach_sel = -1;
       }
     }
     return;
@@ -1155,19 +1408,64 @@ bool SecondScreenSDL_HandleEvent(const SDL_Event *e) {
   if (!ss_win) return false;
   switch (e->type) {
   case SDL_FINGERDOWN:
-    if (e->tfinger.windowID == ss_winid) { handle_tap(e->tfinger.x * W, e->tfinger.y * H); return true; }
-    return false;
-  case SDL_FINGERUP: case SDL_FINGERMOTION:
-    return e->tfinger.windowID == ss_winid;
-  case SDL_MOUSEBUTTONDOWN:
-    if (e->button.windowID == ss_winid) {
-      if (e->button.which != SDL_TOUCH_MOUSEID)  // real mouse (dev); touch already handled
-        handle_tap((float)e->button.x, (float)e->button.y);
+    if (e->tfinger.windowID == ss_winid) {
+      float fx = e->tfinger.x * W, fy = e->tfinger.y * H;
+      if (ach_mode && ach_sel >= 0) { ach_sel = -1; return true; }  // dismiss detail
+      handle_tap(fx, fy);
+      if (tab == TAB_SETTINGS && ach_mode) {
+        ach_drag = true; ach_moved = false;
+        ach_drag_y = ach_down_y = fy; ach_down_x = fx;
+      }
       return true;
     }
     return false;
-  case SDL_MOUSEBUTTONUP: case SDL_MOUSEMOTION:
-    return e->button.windowID == ss_winid;
+  case SDL_FINGERMOTION:
+    if (e->tfinger.windowID == ss_winid) {
+      if (ach_drag) {
+        float my = e->tfinger.y * H;
+        if (fabsf(my - ach_down_y) > 6 * u) ach_moved = true;
+        ach_scroll_drag(my);
+      }
+      return true;
+    }
+    return false;
+  case SDL_FINGERUP:
+    if (e->tfinger.windowID == ss_winid) {
+      if (ach_drag && !ach_moved) ach_open_row(ach_down_x, ach_down_y);
+      ach_drag = false;
+      return true;
+    }
+    return false;
+  case SDL_MOUSEBUTTONDOWN:
+    if (e->button.windowID == ss_winid) {
+      if (e->button.which != SDL_TOUCH_MOUSEID) {  // real mouse (dev); touch already handled
+        float fx = (float)e->button.x, fy = (float)e->button.y;
+        if (ach_mode && ach_sel >= 0) { ach_sel = -1; return true; }
+        handle_tap(fx, fy);
+        if (tab == TAB_SETTINGS && ach_mode) {
+          ach_drag = true; ach_moved = false;
+          ach_drag_y = ach_down_y = fy; ach_down_x = fx;
+        }
+      }
+      return true;
+    }
+    return false;
+  case SDL_MOUSEBUTTONUP:
+    if (e->button.windowID == ss_winid) {
+      if (ach_drag && !ach_moved) ach_open_row(ach_down_x, ach_down_y);
+      ach_drag = false;
+      return true;
+    }
+    return false;
+  case SDL_MOUSEMOTION:
+    if (e->motion.windowID == ss_winid) {
+      if (ach_drag) {
+        if (fabsf((float)e->motion.y - ach_down_y) > 6 * u) ach_moved = true;
+        ach_scroll_drag((float)e->motion.y);
+      }
+      return true;
+    }
+    return false;
   case SDL_WINDOWEVENT:
     if (e->window.windowID != ss_winid) return false;
     if (e->window.event == SDL_WINDOWEVENT_SIZE_CHANGED)
@@ -1226,6 +1524,7 @@ void SecondScreenSDL_Update(void) {
 
   bool dungeon_mode = indoors;
   int ui_mode = mode_for_module(module);
+  ss_poll_ach(module);
   if (module == 0x12 || module <= 0x05) has_last_outdoor = false;
   // houses/caves have no dungeon map: keep the overworld view frozen at the door
   bool in_house = ui_mode == MODE_GAME && indoors && (dungeon_info & 0xFF) == 0xFF;
@@ -1260,6 +1559,8 @@ void SecondScreenSDL_Update(void) {
 
   draw_sidebar(W - side_w + 4 * u, 10 * u, side_w - 14 * u, H - tab_h - 14 * u, dungeon_mode);
   draw_tab_bar(tab_h);
+  if (ach_mode && ach_sel >= 0) draw_ach_detail(map_area_r);
+  draw_toasts();
 
   SDL_RenderPresent(ss_r);
 }

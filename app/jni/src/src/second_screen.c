@@ -64,6 +64,122 @@ void SS_ReadDungFlags(uint8 *out, int n) {
   memcpy(out, g_ram + 0xF000, n);
 }
 
+// ============ achievements (live from the save; shared by all frontends) ============
+// Each entry reads current game state, so progress is correct even on a save
+// loaded fresh - there's no separate unlock file to keep in sync. cur >= max
+// means earned.
+
+static int ss_popcount(int v) { int n = 0; while (v) { n += v & 1; v >>= 1; } return n; }
+
+static const char *const kSsAchNames[] = {
+  "FIRST SWORD", "MASTER SWORD", "TEMPERED SWORD", "GOLDEN SWORD",
+  "BOW AND ARROWS", "SILVER ARROWS", "HOOKSHOT", "FIRE ROD", "ICE ROD",
+  "MEDALLIONS", "MAGIC HAMMER", "TITANS MITT", "PEGASUS BOOTS",
+  "ZORAS FLIPPERS", "MAGIC MIRROR", "MAGIC CAPE", "CANE OF BYRNA",
+  "CANE OF SOMARIA", "MOON PEARL", "BUG NET", "BOOK OF MUDORA",
+  "BOTTLE COLLECTOR", "BOMB CAPACITY", "ARROW CAPACITY", "HALF MAGIC",
+  "PENDANTS", "CRYSTALS", "HEART CONTAINERS", "HERO OF HYRULE",
+};
+enum { kSsAchCount = (int)(sizeof(kSsAchNames) / sizeof(kSsAchNames[0])) };
+
+int SS_AchCount(void) { return kSsAchCount; }
+
+const char *SS_AchName(int id) {
+  return (id >= 0 && id < kSsAchCount) ? kSsAchNames[id] : "";
+}
+
+// Short, renderable (A-Z / 0-9 / space) descriptions, one per name above.
+static const char *const kSsAchDesc[] = {
+  "TAKE THE FIGHTERS SWORD FROM YOUR UNCLE",
+  "PULL THE MASTER SWORD FROM ITS PEDESTAL",
+  "HAVE THE BLACKSMITHS TEMPER YOUR BLADE",
+  "UPGRADE ALL THE WAY TO THE GOLDEN SWORD",
+  "FIND A BOW TO FIRE ARROWS",
+  "OBTAIN THE SILVER ARROWS THAT GANON FEARS",
+  "GRAB THE HOOKSHOT TO CROSS GAPS",
+  "FIND THE FIRE ROD",
+  "FIND THE ICE ROD",
+  "COLLECT THE BOMBOS ETHER AND QUAKE MEDALLIONS",
+  "SWING THE MAGIC HAMMER",
+  "LIFT THE DARKEST ROCKS WITH THE TITANS MITT",
+  "DASH ACROSS HYRULE WITH THE PEGASUS BOOTS",
+  "SWIM FREELY WITH ZORAS FLIPPERS",
+  "WARP BETWEEN WORLDS WITH THE MAGIC MIRROR",
+  "VANISH FROM SIGHT WITH THE MAGIC CAPE",
+  "FIND THE CANE OF BYRNA",
+  "FIND THE CANE OF SOMARIA",
+  "KEEP YOUR FORM IN THE DARK WORLD WITH THE MOON PEARL",
+  "CATCH BUGS AND FAIRIES WITH THE BUG NET",
+  "READ ANCIENT HYLIAN WITH THE BOOK OF MUDORA",
+  "GATHER ALL FOUR MAGIC BOTTLES",
+  "UPGRADE YOUR BOMB CAPACITY TO THE MAX",
+  "UPGRADE YOUR ARROW CAPACITY TO THE MAX",
+  "HALVE YOUR MAGIC COST",
+  "EARN ALL THREE PENDANTS OF VIRTUE",
+  "FREE ALL SEVEN MAIDENS AND TAKE THEIR CRYSTALS",
+  "FILL YOUR LIFE TO TWENTY HEART CONTAINERS",
+  "EARN EVERY OTHER ACHIEVEMENT TO SAVE HYRULE",
+};
+
+const char *SS_AchDesc(int id) {
+  return (id >= 0 && id < kSsAchCount) ? kSsAchDesc[id] : "";
+}
+
+// Current progress toward achievement id; *max is the target (1 for yes/no).
+int SS_AchProgress(int id, int *max) {
+  int m = 1, cur = 0;
+  switch (id) {
+    case 0:  cur = link_sword_type >= 1; break;
+    case 1:  cur = link_sword_type >= 2; break;
+    case 2:  cur = link_sword_type >= 3; break;
+    case 3:  cur = link_sword_type >= 4; break;
+    case 4:  cur = link_item_bow >= 1; break;
+    case 5:  cur = link_item_bow >= 3; break;
+    case 6:  cur = link_item_hookshot > 0; break;
+    case 7:  cur = link_item_fire_rod > 0; break;
+    case 8:  cur = link_item_ice_rod > 0; break;
+    case 9:  m = 3; cur = (link_item_bombos_medallion > 0) + (link_item_ether_medallion > 0) +
+                          (link_item_quake_medallion > 0); break;
+    case 10: cur = link_item_hammer > 0; break;
+    case 11: cur = link_item_gloves >= 2; break;
+    case 12: cur = link_item_boots > 0; break;
+    case 13: cur = link_item_flippers > 0; break;
+    case 14: cur = link_item_mirror > 0; break;
+    case 15: cur = link_item_cape > 0; break;
+    case 16: cur = link_item_cane_byrna > 0; break;
+    case 17: cur = link_item_cane_somaria > 0; break;
+    case 18: cur = link_item_moon_pearl > 0; break;
+    case 19: cur = link_item_bug_net > 0; break;
+    case 20: cur = link_item_book_of_mudora > 0; break;
+    case 21: m = 4; cur = (link_bottle_info[0] != 0) + (link_bottle_info[1] != 0) +
+                          (link_bottle_info[2] != 0) + (link_bottle_info[3] != 0); break;
+    case 22: m = 7; cur = link_bomb_upgrades & 7; break;
+    case 23: m = 7; cur = link_arrow_upgrades & 7; break;
+    case 24: cur = link_magic_consumption >= 1; break;
+    case 25: m = 3; cur = ss_popcount(link_which_pendants & 7); break;
+    case 26: m = 7; cur = ss_popcount(link_has_crystals & 0x7F); break;
+    case 27: m = 20; cur = link_health_capacity / 8; break;
+    case 28: {  // Hero of Hyrule: everything else earned
+      m = kSsAchCount - 1;
+      for (int i = 0; i < kSsAchCount - 1; i++) {
+        int mm;
+        if (SS_AchProgress(i, &mm) >= mm) cur++;
+      }
+      break;
+    }
+    default: break;
+  }
+  if (max) *max = m;
+  return cur;
+}
+
+int SS_AchUnlockedCount(void) {
+  int n = 0, m;
+  for (int i = 0; i < kSsAchCount; i++)
+    if (SS_AchProgress(i, &m) >= m) n++;
+  return n;
+}
+
 // ============ runtime asset generation ============
 
 // decoded HUD 2bpp sheets 0x6a,0x6b,0x69 -> 384 tiles of 64 pixel values (0..3),
@@ -398,6 +514,21 @@ bool SS_IsHudHidden(void) {
   return g_ss_hide_hud;
 }
 
+// Live feature toggles (low-health beep, etc). The bit change is queued and
+// applied on the game thread in the frame hook, mirroring the game's own
+// g_wanted_zelda_features -> enhanced_features0 sync.
+static volatile uint32 g_ss_feat_set, g_ss_feat_clear;
+
+void SS_SetFeature(unsigned mask, bool on) {
+  if (on) { g_ss_feat_set |= mask; g_ss_feat_clear &= ~mask; }
+  else    { g_ss_feat_clear |= mask; g_ss_feat_set &= ~mask; }
+}
+
+bool SS_GetFeature(unsigned mask) {
+  uint32 w = (g_wanted_zelda_features | g_ss_feat_set) & ~g_ss_feat_clear;
+  return (w & mask) != 0;
+}
+
 void SS_ArmButtonCapture(bool arm) { g_ss_capture_button = arm ? -2 : -1; }
 
 // Returns the captured gamepad button and rearms idle; -2 still waiting, -1 idle.
@@ -424,6 +555,10 @@ void SS_SetGamepadControls(const int *in) {
 
 // Called from the main loop right before ZeldaRunFrame (game thread).
 void SecondScreen_RunFrameHook(void) {
+  if (g_ss_feat_set | g_ss_feat_clear) {
+    g_wanted_zelda_features = (g_wanted_zelda_features | g_ss_feat_set) & ~g_ss_feat_clear;
+    g_ss_feat_set = g_ss_feat_clear = 0;
+  }
   int ws = g_pending_widescreen;
   if (ws >= 0) {
     g_pending_widescreen = -1;
