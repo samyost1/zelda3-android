@@ -39,6 +39,7 @@ const char *SS_AchDesc(int id);
 void SS_SetFeature(unsigned mask, bool on);
 bool SS_GetFeature(unsigned mask);
 int  SS_AchUnlockedCount(void);
+int  SS_PollNewUnlock(void);
 bool SS_RenderIconSheet(uint32_t *px);
 bool SS_RenderGlyphSheet(uint32_t *px);
 bool SS_RenderLetterSheet(uint32_t *px);
@@ -182,8 +183,6 @@ static float ach_drag_y, ach_down_x, ach_down_y;
 static bool  ach_moved;
 static RectFS ach_row_r[32];            // per-row hit rects (filled while drawing)
 static int   ach_sel = -1;              // open detail card, -1 = list
-static int   ach_seen_mask;             // unlocked bitmask for toast edge-detect
-static bool  ach_seeded;
 static int   toast_q[32], toast_qn;     // queued achievement ids
 static int   toast_id = -1;
 static uint32_t toast_at;
@@ -1090,21 +1089,6 @@ static void draw_ach_detail(RectFS r) {
   draw_text("TAP TO CLOSE", cx + cw / 2 - text_width("TAP TO CLOSE", 2 * u) / 2, cy + ch - 34 * u, 2 * u);
 }
 
-// Watch for freshly-earned achievements. Seeds silently the first playing frame
-// so a loaded save doesn't dump a toast for everything already done; reseeds at
-// the title so loading a different save re-baselines.
-static void ss_poll_ach(int module) {
-  if (module <= 0x05) { ach_seeded = false; return; }   // title / file select
-  int cur = 0, m, n = SS_AchCount();
-  for (int i = 0; i < n && i < 32; i++)
-    if (SS_AchProgress(i, &m) >= m) cur |= (1 << i);
-  if (!ach_seeded) { ach_seen_mask = cur; ach_seeded = true; return; }
-  int newly = cur & ~ach_seen_mask;
-  ach_seen_mask = cur;
-  for (int i = 0; i < n && newly; i++)
-    if (newly & (1 << i)) { if (toast_qn < 32) toast_q[toast_qn++] = i; newly &= ~(1 << i); }
-}
-
 static void draw_toasts(void) {
   uint32_t now = SDL_GetTicks();
   if (toast_id < 0 && toast_qn > 0) {
@@ -1524,7 +1508,8 @@ void SecondScreenSDL_Update(void) {
 
   bool dungeon_mode = indoors;
   int ui_mode = mode_for_module(module);
-  ss_poll_ach(module);
+  for (int nid; (nid = SS_PollNewUnlock()) >= 0; )
+    if (toast_qn < 32) toast_q[toast_qn++] = nid;
   if (module == 0x12 || module <= 0x05) has_last_outdoor = false;
   // houses/caves have no dungeon map: keep the overworld view frozen at the door
   bool in_house = ui_mode == MODE_GAME && indoors && (dungeon_info & 0xFF) == 0xFF;

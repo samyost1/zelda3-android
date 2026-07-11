@@ -14,6 +14,9 @@ bool SS_RenderDungeonFloor(int palace, int floorIdx, uint32 *px); bool SS_Render
 void SS_EquipSlot(int slot); void SS_SetWidescreen(bool on); bool SS_IsWidescreen(void);
 void SS_SetHudHidden(bool hide); bool SS_IsHudHidden(void); void SS_ArmButtonCapture(bool arm);
 int SS_GetCapturedButton(void); void SS_GetGamepadControls(int *out); void SS_SetGamepadControls(const int *in);
+int SS_AchCount(void); const char *SS_AchName(int id); const char *SS_AchDesc(int id);
+int SS_AchProgress(int id, int *max); int SS_AchUnlockedCount(void); int SS_PollNewUnlock(void);
+void SS_SetFeature(unsigned mask, bool on); bool SS_GetFeature(unsigned mask);
 
 #include <jni.h>
 
@@ -26,6 +29,17 @@ JNIEXPORT jint JNICALL Java_com_dishii_zelda3_GameState_getModule(JNIEnv *env, j
 JNIEXPORT jboolean JNICALL Java_com_dishii_zelda3_GameState_isIndoors(JNIEnv *env, jclass clazz) { return SS_IsIndoors(); }
 JNIEXPORT jint JNICALL Java_com_dishii_zelda3_GameState_getEquippedSlot(JNIEnv *env, jclass clazz) { return SS_GetEquippedSlot(); }
 JNIEXPORT jint JNICALL Java_com_dishii_zelda3_GameState_getDungeon(JNIEnv *env, jclass clazz) { return SS_GetDungeon(); }
+
+// --- achievements + live feature toggles (shared core) ---
+JNIEXPORT jint JNICALL Java_com_dishii_zelda3_GameState_achCount(JNIEnv *env, jclass clazz) { return SS_AchCount(); }
+JNIEXPORT jstring JNICALL Java_com_dishii_zelda3_GameState_achName(JNIEnv *env, jclass clazz, jint id) { return (*env)->NewStringUTF(env, SS_AchName(id)); }
+JNIEXPORT jstring JNICALL Java_com_dishii_zelda3_GameState_achDesc(JNIEnv *env, jclass clazz, jint id) { return (*env)->NewStringUTF(env, SS_AchDesc(id)); }
+JNIEXPORT jint JNICALL Java_com_dishii_zelda3_GameState_achProgress(JNIEnv *env, jclass clazz, jint id) { int m = 1; return SS_AchProgress(id, &m); }
+JNIEXPORT jint JNICALL Java_com_dishii_zelda3_GameState_achMax(JNIEnv *env, jclass clazz, jint id) { int m = 1; SS_AchProgress(id, &m); return m; }
+JNIEXPORT jint JNICALL Java_com_dishii_zelda3_GameState_achUnlockedCount(JNIEnv *env, jclass clazz) { return SS_AchUnlockedCount(); }
+JNIEXPORT jint JNICALL Java_com_dishii_zelda3_GameState_pollNewUnlock(JNIEnv *env, jclass clazz) { return SS_PollNewUnlock(); }
+JNIEXPORT void JNICALL Java_com_dishii_zelda3_GameState_setFeature(JNIEnv *env, jclass clazz, jint mask, jboolean on) { SS_SetFeature((unsigned)mask, on); }
+JNIEXPORT jboolean JNICALL Java_com_dishii_zelda3_GameState_getFeature(JNIEnv *env, jclass clazz, jint mask) { return SS_GetFeature((unsigned)mask); }
 
 JNIEXPORT void JNICALL Java_com_dishii_zelda3_GameState_readSram(JNIEnv *env, jclass clazz, jbyteArray out) {
   uint8 tmp[0x100];

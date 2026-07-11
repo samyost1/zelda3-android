@@ -180,6 +180,29 @@ int SS_AchUnlockedCount(void) {
   return n;
 }
 
+// Toast edge-detection, shared so any frontend only has to render the popup.
+// Seeds silently the first playing frame (so a loaded save doesn't report
+// everything already earned) and reseeds at the title/file-select (so loading a
+// different save re-baselines). Returns the id of one newly-unlocked
+// achievement, or -1; call repeatedly to drain all that flipped this frame.
+static uint32 g_ss_ach_seen;
+static bool g_ss_ach_seeded;
+
+int SS_PollNewUnlock(void) {
+  if (main_module_index <= 0x05) { g_ss_ach_seeded = false; return -1; }
+  uint32 cur = 0;
+  int m;
+  for (int i = 0; i < kSsAchCount && i < 32; i++)
+    if (SS_AchProgress(i, &m) >= m) cur |= (1u << i);
+  if (!g_ss_ach_seeded) { g_ss_ach_seen = cur; g_ss_ach_seeded = true; return -1; }
+  uint32 newly = cur & ~g_ss_ach_seen;
+  if (!newly) return -1;
+  int id = 0;
+  while (!(newly & (1u << id))) id++;
+  g_ss_ach_seen |= (1u << id);
+  return id;
+}
+
 // ============ runtime asset generation ============
 
 // decoded HUD 2bpp sheets 0x6a,0x6b,0x69 -> 384 tiles of 64 pixel values (0..3),
