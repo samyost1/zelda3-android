@@ -21,6 +21,22 @@ public class GameState {
     public static native int getDungeon();
     /** Fills out (up to 0x500 bytes) with save_dung_info: uint16/room, low nibble = visited quadrants. */
     public static native void readDungFlags(byte[] out);
+
+    // ---- achievements (read live from the save; shared SS_Ach* core) ----
+    /** Number of achievements. */
+    public static native int achCount();
+    /** Display name for achievement id (upper-case, A-Z/0-9/space). */
+    public static native String achName(int id);
+    /** One-line description for achievement id. */
+    public static native String achDesc(int id);
+    /** Current progress toward achievement id (>= max means earned). */
+    public static native int achProgress(int id);
+    /** Target for achievement id (1 for a plain yes/no achievement). */
+    public static native int achMax(int id);
+    /** How many achievements are currently earned. */
+    public static native int achUnlockedCount();
+    /** Id of one newly-unlocked achievement since the last call, or -1; call repeatedly to drain. */
+    public static native int pollNewUnlock();
     /** Request equipping the item in grid slot 1..20; applied on the game thread. */
     public static native void equipSlot(int slot);
     public static native void assignSlotX(int slot);

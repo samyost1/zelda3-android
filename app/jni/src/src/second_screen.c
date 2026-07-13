@@ -74,6 +74,145 @@ void SS_ReadDungFlags(uint8 *out, int n) {
   memcpy(out, g_ram + 0xF000, n);
 }
 
+// ============ achievements (live from the save; shared by all frontends) ============
+// Each entry reads current game state, so progress is correct even on a save
+// loaded fresh - there's no separate unlock file to keep in sync. cur >= max
+// means earned.
+
+static int ss_popcount(int v) { int n = 0; while (v) { n += v & 1; v >>= 1; } return n; }
+
+static const char *const kSsAchNames[] = {
+  "FIRST SWORD", "MASTER SWORD", "TEMPERED SWORD", "GOLDEN SWORD",
+  "BOW AND ARROWS", "SILVER ARROWS", "HOOKSHOT", "FIRE ROD", "ICE ROD",
+  "MEDALLIONS", "MAGIC HAMMER", "TITANS MITT", "PEGASUS BOOTS",
+  "ZORAS FLIPPERS", "MAGIC MIRROR", "MAGIC CAPE", "CANE OF BYRNA",
+  "CANE OF SOMARIA", "MOON PEARL", "BUG NET", "BOOK OF MUDORA",
+  "BOTTLE COLLECTOR", "BOMB CAPACITY", "ARROW CAPACITY", "HALF MAGIC",
+  "PENDANTS", "CRYSTALS", "HEART CONTAINERS", "HERO OF HYRULE",
+};
+enum { kSsAchCount = (int)(sizeof(kSsAchNames) / sizeof(kSsAchNames[0])) };
+
+int SS_AchCount(void) { return kSsAchCount; }
+
+const char *SS_AchName(int id) {
+  return (id >= 0 && id < kSsAchCount) ? kSsAchNames[id] : "";
+}
+
+// Short, renderable (A-Z / 0-9 / space) descriptions, one per name above.
+static const char *const kSsAchDesc[] = {
+  "TAKE THE FIGHTERS SWORD FROM YOUR UNCLE",
+  "PULL THE MASTER SWORD FROM ITS PEDESTAL",
+  "HAVE THE BLACKSMITHS TEMPER YOUR BLADE",
+  "UPGRADE ALL THE WAY TO THE GOLDEN SWORD",
+  "FIND A BOW TO FIRE ARROWS",
+  "OBTAIN THE SILVER ARROWS THAT GANON FEARS",
+  "GRAB THE HOOKSHOT TO CROSS GAPS",
+  "FIND THE FIRE ROD",
+  "FIND THE ICE ROD",
+  "COLLECT THE BOMBOS ETHER AND QUAKE MEDALLIONS",
+  "SWING THE MAGIC HAMMER",
+  "LIFT THE DARKEST ROCKS WITH THE TITANS MITT",
+  "DASH ACROSS HYRULE WITH THE PEGASUS BOOTS",
+  "SWIM FREELY WITH ZORAS FLIPPERS",
+  "WARP BETWEEN WORLDS WITH THE MAGIC MIRROR",
+  "VANISH FROM SIGHT WITH THE MAGIC CAPE",
+  "FIND THE CANE OF BYRNA",
+  "FIND THE CANE OF SOMARIA",
+  "KEEP YOUR FORM IN THE DARK WORLD WITH THE MOON PEARL",
+  "CATCH BUGS AND FAIRIES WITH THE BUG NET",
+  "READ ANCIENT HYLIAN WITH THE BOOK OF MUDORA",
+  "GATHER ALL FOUR MAGIC BOTTLES",
+  "UPGRADE YOUR BOMB CAPACITY TO THE MAX",
+  "UPGRADE YOUR ARROW CAPACITY TO THE MAX",
+  "HALVE YOUR MAGIC COST",
+  "EARN ALL THREE PENDANTS OF VIRTUE",
+  "FREE ALL SEVEN MAIDENS AND TAKE THEIR CRYSTALS",
+  "FILL YOUR LIFE TO TWENTY HEART CONTAINERS",
+  "EARN EVERY OTHER ACHIEVEMENT TO SAVE HYRULE",
+};
+
+const char *SS_AchDesc(int id) {
+  return (id >= 0 && id < kSsAchCount) ? kSsAchDesc[id] : "";
+}
+
+// Current progress toward achievement id; *max is the target (1 for yes/no).
+int SS_AchProgress(int id, int *max) {
+  int m = 1, cur = 0;
+  switch (id) {
+    case 0:  cur = link_sword_type >= 1; break;
+    case 1:  cur = link_sword_type >= 2; break;
+    case 2:  cur = link_sword_type >= 3; break;
+    case 3:  cur = link_sword_type >= 4; break;
+    case 4:  cur = link_item_bow >= 1; break;
+    case 5:  cur = link_item_bow >= 3; break;
+    case 6:  cur = link_item_hookshot > 0; break;
+    case 7:  cur = link_item_fire_rod > 0; break;
+    case 8:  cur = link_item_ice_rod > 0; break;
+    case 9:  m = 3; cur = (link_item_bombos_medallion > 0) + (link_item_ether_medallion > 0) +
+                          (link_item_quake_medallion > 0); break;
+    case 10: cur = link_item_hammer > 0; break;
+    case 11: cur = link_item_gloves >= 2; break;
+    case 12: cur = link_item_boots > 0; break;
+    case 13: cur = link_item_flippers > 0; break;
+    case 14: cur = link_item_mirror > 0; break;
+    case 15: cur = link_item_cape > 0; break;
+    case 16: cur = link_item_cane_byrna > 0; break;
+    case 17: cur = link_item_cane_somaria > 0; break;
+    case 18: cur = link_item_moon_pearl > 0; break;
+    case 19: cur = link_item_bug_net > 0; break;
+    case 20: cur = link_item_book_of_mudora > 0; break;
+    case 21: m = 4; cur = (link_bottle_info[0] != 0) + (link_bottle_info[1] != 0) +
+                          (link_bottle_info[2] != 0) + (link_bottle_info[3] != 0); break;
+    case 22: m = 7; cur = link_bomb_upgrades & 7; break;
+    case 23: m = 7; cur = link_arrow_upgrades & 7; break;
+    case 24: cur = link_magic_consumption >= 1; break;
+    case 25: m = 3; cur = ss_popcount(link_which_pendants & 7); break;
+    case 26: m = 7; cur = ss_popcount(link_has_crystals & 0x7F); break;
+    case 27: m = 20; cur = link_health_capacity / 8; break;
+    case 28: {  // Hero of Hyrule: everything else earned
+      m = kSsAchCount - 1;
+      for (int i = 0; i < kSsAchCount - 1; i++) {
+        int mm;
+        if (SS_AchProgress(i, &mm) >= mm) cur++;
+      }
+      break;
+    }
+    default: break;
+  }
+  if (max) *max = m;
+  return cur;
+}
+
+int SS_AchUnlockedCount(void) {
+  int n = 0, m;
+  for (int i = 0; i < kSsAchCount; i++)
+    if (SS_AchProgress(i, &m) >= m) n++;
+  return n;
+}
+
+// Toast edge-detection, shared so any frontend only has to render the popup.
+// Seeds silently the first playing frame (so a loaded save doesn't report
+// everything already earned) and reseeds at the title/file-select (so loading a
+// different save re-baselines). Returns the id of one newly-unlocked
+// achievement, or -1; call repeatedly to drain all that flipped this frame.
+static uint32 g_ss_ach_seen;
+static bool g_ss_ach_seeded;
+
+int SS_PollNewUnlock(void) {
+  if (main_module_index <= 0x05) { g_ss_ach_seeded = false; return -1; }
+  uint32 cur = 0;
+  int m;
+  for (int i = 0; i < kSsAchCount && i < 32; i++)
+    if (SS_AchProgress(i, &m) >= m) cur |= (1u << i);
+  if (!g_ss_ach_seeded) { g_ss_ach_seen = cur; g_ss_ach_seeded = true; return -1; }
+  uint32 newly = cur & ~g_ss_ach_seen;
+  if (!newly) return -1;
+  int id = 0;
+  while (!(newly & (1u << id))) id++;
+  g_ss_ach_seen |= (1u << id);
+  return id;
+}
+
 // ============ runtime asset generation ============
 
 // decoded HUD 2bpp sheets 0x6a,0x6b,0x69 -> 384 tiles of 64 pixel values (0..3),

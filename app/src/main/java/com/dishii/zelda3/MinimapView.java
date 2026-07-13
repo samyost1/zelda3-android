@@ -129,7 +129,8 @@ public class MinimapView extends View {
     // touch regions (recomputed during draw)
     private final RectF tabItemsR = new RectF(), tabGearR = new RectF();
     private final RectF tabSettingsR = new RectF(), remapBackR = new RectF();
-    private final RectF[] settingsRowR = new RectF[4 + FEAT_MASKS.length];
+    // settings rows: REMAP, ACHIEVEMENTS, WIDESCREEN, TOP HUD, X RING, then feature toggles
+    private final RectF[] settingsRowR = new RectF[5 + FEAT_MASKS.length];
     private final RectF[] remapRowR = new RectF[12];
     private final RectF mapAreaR = new RectF(), yRingR = new RectF(), xRingR = new RectF();
 
@@ -139,6 +140,19 @@ public class MinimapView extends View {
     private boolean settingsTouch, settingsScrolling;
     private float settingsTouchStartY, settingsTouchLastY;
     private boolean remapMode = false;
+
+    // achievements sub-panel (opened from the settings list)
+    private boolean achMode = false;
+    private int achSel = -1;                 // open detail card, -1 = list
+    private float achScroll, achMaxScroll;
+    private float achListTop, achListBot;
+    private final RectF achBackR = new RectF();
+    private final RectF[] achRowR = new RectF[64];   // per-row hit rects, filled while drawing
+    private int achRowCount = 0;
+    // 'achievement unlocked' toasts: SS_PollNewUnlock feeds a queue, one shown at a time
+    private final java.util.ArrayDeque<Integer> toastQ = new java.util.ArrayDeque<>();
+    private int toastId = -1;
+    private long toastAt;                     // nanoTime the current toast appeared
     private int remapArm = -1;          // command index waiting for a button press
     private long remapArmAt;
     private final int[] padControls = new int[12];
@@ -194,6 +208,7 @@ public class MinimapView extends View {
         for (int i = 0; i < plaqueR.length; i++) plaqueR[i] = new RectF();
         for (int i = 0; i < remapRowR.length; i++) remapRowR[i] = new RectF();
         for (int i = 0; i < settingsRowR.length; i++) settingsRowR[i] = new RectF();
+        for (int i = 0; i < achRowR.length; i++) achRowR[i] = new RectF();
         xRing = readIniBool("[General]", "SecondScreenXItemRing");
         loadAssets(context);
     }
@@ -379,6 +394,13 @@ public class MinimapView extends View {
             linkX = lastOutX; linkY = lastOutY; area = lastOutArea;
         }
 
+        // drain any achievements that flipped to unlocked this frame into the toast queue
+        if (!nativeBroken) {
+            int nid;
+            while ((nid = GameState.pollNewUnlock()) >= 0)
+                if (toastQ.size() < 32) toastQ.add(nid);
+        }
+
         canvas.drawRect(0, 0, w, h, dungeonMode ? stonePaint : menuPaint);
         int tabH = (int) (96 * u);   // buttons sit above the system gesture zone
         int sideW = (int) (200 * u);
@@ -397,6 +419,9 @@ public class MinimapView extends View {
         }
         drawSidebar(canvas, w - sideW + 4 * u, 10 * u, sideW - 14 * u, h - tabH - 14 * u, dungeonMode);
         drawTabBar(canvas, w, h, tabH);
+
+        if (tab == TAB_SETTINGS && achMode && achSel >= 0) drawAchDetail(canvas, mapAreaR);
+        drawToasts(canvas, w);
 
         if (isAttachedToWindow()) postInvalidateOnAnimation();
     }
@@ -681,6 +706,10 @@ public class MinimapView extends View {
             drawRemapPanel(c, r);
             return;
         }
+        if (achMode) {
+            drawAchPanel(c, r);
+            return;
+        }
         drawText(c, "SETTINGS", r.centerX() - textWidth("SETTINGS", 3 * u) / 2, r.top + 18 * u, 3 * u);
 
         boolean ws = false, hudHidden = false;
@@ -711,11 +740,12 @@ public class MinimapView extends View {
             float ty = row.centerY() - 12 * u;
             String label, v;
             if (i == 0) { label = "REMAP BUTTONS"; v = null; }
-            else if (i == 1) { label = "WIDESCREEN"; v = ws ? "ON" : "OFF"; }
-            else if (i == 2) { label = "TOP SCREEN HUD"; v = hudHidden ? "OFF" : "ON"; }
-            else if (i == 3) { label = "X ITEM RING"; v = xRing ? "ON" : "OFF"; }
+            else if (i == 1) { label = "ACHIEVEMENTS"; v = null; }
+            else if (i == 2) { label = "WIDESCREEN"; v = ws ? "ON" : "OFF"; }
+            else if (i == 3) { label = "TOP SCREEN HUD"; v = hudHidden ? "OFF" : "ON"; }
+            else if (i == 4) { label = "X ITEM RING"; v = xRing ? "ON" : "OFF"; }
             else {
-                int f = i - 4;
+                int f = i - 5;
                 label = FEAT_LABELS[f];
                 v = (((feats & FEAT_MASKS[f]) != 0) ^ FEAT_INVERT[f]) ? "ON" : "OFF";
             }
@@ -755,15 +785,19 @@ public class MinimapView extends View {
                 GameState.getGamepadControls(padControls);
                 remapMode = true;
             } else if (i == 1) {
+                achMode = true;
+                achScroll = 0;
+                achSel = -1;
+            } else if (i == 2) {
                 boolean on = !GameState.isWidescreen();
                 GameState.setWidescreen(on);
                 updateIni("[General]", "ExtendedAspectRatio", on ? "16:9" : "4:3");
-            } else if (i == 2) {
+            } else if (i == 3) {
                 boolean hide = !GameState.isHudHidden();
                 GameState.setHudHidden(hide);
                 getContext().getSharedPreferences("secondscreen", 0)
                         .edit().putBoolean("hideTopHud", hide).apply();
-            } else if (i == 3) {
+            } else if (i == 4) {
                 xRing = !xRing;
                 armedRing = 0;
                 updateIni("[General]", "SecondScreenXItemRing", xRing ? "1" : "0");
@@ -774,7 +808,7 @@ public class MinimapView extends View {
                     updateIni(FEAT_SECTIONS[0], FEAT_KEYS[0], "1");
                 }
             } else {
-                int f = i - 4;
+                int f = i - 5;
                 boolean on = (GameState.getFeatures() & FEAT_MASKS[f]) == 0;
                 GameState.setFeature(FEAT_MASKS[f], on);
                 updateIni(FEAT_SECTIONS[f], FEAT_KEYS[f], on ? "1" : "0");
@@ -828,6 +862,178 @@ public class MinimapView extends View {
                        ? GameState.PAD_BUTTON_LABEL[padControls[i]] : "----");
             drawText(c, v, row.right - 14 * u - textWidth(v, 2.2f * u), ty, 2.2f * u);
         }
+    }
+
+    // ---------- achievements ----------
+
+    // Wrap s into up to maxLines lines that each fit maxw at text scale sc.
+    private java.util.List<String> wrapText(String s, float maxw, float sc, int maxLines) {
+        java.util.ArrayList<String> out = new java.util.ArrayList<>();
+        String cur = "";
+        for (String word : s.split(" ")) {
+            if (word.isEmpty()) continue;
+            if (out.size() >= maxLines) break;
+            String trial = cur.isEmpty() ? word : cur + " " + word;
+            if (!cur.isEmpty() && textWidth(trial, sc) > maxw) {
+                out.add(cur);
+                cur = word;
+            } else {
+                cur = trial;
+            }
+        }
+        if (!cur.isEmpty() && out.size() < maxLines) out.add(cur);
+        if (out.isEmpty()) out.add("");
+        return out;
+    }
+
+    // A small gold checkmark centered near (cx, cy); s is the tick's overall size.
+    private void drawCheck(Canvas c, float cx, float cy, float s, int col) {
+        aa.setStyle(Paint.Style.STROKE);
+        aa.setStrokeWidth(2.6f * u);
+        aa.setColor(col);
+        c.drawLine(cx - 0.40f * s, cy, cx + 0.05f * s, cy + 0.45f * s, aa);
+        c.drawLine(cx + 0.05f * s, cy + 0.45f * s, cx + 0.80f * s, cy - 0.35f * s, aa);
+    }
+
+    // Scrollable achievements list, opened from the settings panel.
+    private void drawAchPanel(Canvas c, RectF r) {
+        int total = 0, done = 0;
+        if (!nativeBroken) { total = GameState.achCount(); done = GameState.achUnlockedCount(); }
+        achRowCount = total;
+
+        achBackR.set(r.left + 20 * u, r.top + 12 * u, r.left + 110 * u, r.top + 50 * u);
+        fill.setColor(Color.rgb(28, 28, 28));
+        c.drawRoundRect(achBackR, 8 * u, 8 * u, fill);
+        stroke.setStrokeWidth(3 * u); stroke.setColor(COL_GOLD_DARK);
+        c.drawRoundRect(achBackR, 8 * u, 8 * u, stroke);
+        drawText(c, "BACK", achBackR.centerX() - textWidth("BACK", 2.2f * u) / 2,
+                achBackR.centerY() - 9 * u, 2.2f * u);
+        String hdr = "ACHIEVEMENTS " + done + " OF " + total;
+        drawText(c, hdr, achBackR.right + 18 * u, achBackR.centerY() - 11 * u, 2.6f * u);
+
+        float listX = r.left + 20 * u, listW = r.width() - 40 * u;
+        achListTop = r.top + 60 * u;
+        achListBot = r.bottom - 14 * u;
+        float viewH = achListBot - achListTop;
+
+        float sc = 2.2f * u, lineH = 18 * u, gap = 8 * u, box = 24 * u;
+        float textX = listX + 14 * u + box + 10 * u;
+        float nameW = Math.max(40 * u, (listX + listW - 100 * u) - textX);
+
+        c.save();
+        c.clipRect(listX, achListTop, listX + listW, achListBot);
+        float y = achListTop - achScroll;
+        for (int id = 0; id < total; id++) {
+            int mx = 1, cur = 0;
+            if (!nativeBroken) { mx = Math.max(1, GameState.achMax(id)); cur = GameState.achProgress(id); }
+            boolean unlocked = cur >= mx;
+            java.util.List<String> lines = wrapText(nativeBroken ? "" : GameState.achName(id), nameW, sc, 3);
+            int nl = lines.size();
+            float rowH = Math.max(nl * lineH + 16 * u, box + 14 * u);
+            if (id < achRowR.length) achRowR[id].set(listX, y, listX + listW, y + rowH);
+
+            if (y + rowH >= achListTop && y <= achListBot) {   // cull off-screen rows
+                dst.set(listX, y, listX + listW, y + rowH);
+                fill.setColor(unlocked ? COL_GOLD : Color.rgb(46, 46, 46));
+                c.drawRoundRect(dst, 7 * u, 7 * u, fill);
+                dst.set(listX + 2.5f * u, y + 2.5f * u, listX + listW - 2.5f * u, y + rowH - 2.5f * u);
+                fill.setColor(unlocked ? Color.rgb(44, 36, 10) : Color.rgb(22, 22, 22));
+                c.drawRoundRect(dst, 5 * u, 5 * u, fill);
+                float bx = listX + 14 * u, by = y + (rowH - box) / 2;
+                dst.set(bx, by, bx + box, by + box);
+                fill.setColor(unlocked ? COL_GOLD_DARK : Color.rgb(60, 60, 60));
+                c.drawRoundRect(dst, 4 * u, 4 * u, fill);
+                if (unlocked) drawCheck(c, bx + box * 0.5f, by + box * 0.28f, box * 0.6f, COL_GOLD);
+                float ty = y + (rowH - nl * lineH) / 2;
+                for (int i = 0; i < nl; i++) drawText(c, lines.get(i), textX, ty + i * lineH, sc);
+                if (mx > 1 && !unlocked) {
+                    String pv = cur + " OF " + mx;
+                    drawText(c, pv, listX + listW - 14 * u - textWidth(pv, 2 * u), y + rowH / 2 - 7 * u, 2 * u);
+                }
+            }
+            y += rowH + gap;
+        }
+        c.restore();
+
+        float contentH = y + achScroll - achListTop;
+        achMaxScroll = Math.max(0, contentH - viewH);
+        achScroll = clamp(achScroll, 0, achMaxScroll);
+
+        if (achMaxScroll > 0) {   // scrollbar hint
+            float th = Math.max(24 * u, viewH * viewH / contentH);
+            float ty = achListTop + (viewH - th) * (achScroll / achMaxScroll);
+            dst.set(listX + listW - 5 * u, ty, listX + listW - u, ty + th);
+            fill.setColor(COL_GOLD_DARK);
+            c.drawRoundRect(dst, 2 * u, 2 * u, fill);
+        }
+    }
+
+    // Modal detail card for the selected achievement; dismissed by tapping anywhere.
+    private void drawAchDetail(Canvas c, RectF r) {
+        int id = achSel, mx = 1, cur = 0;
+        if (!nativeBroken) { mx = Math.max(1, GameState.achMax(id)); cur = GameState.achProgress(id); }
+        boolean unlocked = cur >= mx;
+
+        fill.setColor(Color.argb(176, 0, 0, 0));   // dim the panel behind the card
+        c.drawRect(r, fill);
+
+        float cw = r.width() * 0.82f, ch = r.height() * 0.68f;
+        float cx = r.left + (r.width() - cw) / 2, cy = r.top + (r.height() - ch) / 2;
+        dst.set(cx, cy, cx + cw, cy + ch);
+        fill.setColor(unlocked ? COL_GOLD : COL_BOX_BORDER2);
+        c.drawRoundRect(dst, 12 * u, 12 * u, fill);
+        dst.set(cx + 4 * u, cy + 4 * u, cx + cw - 4 * u, cy + ch - 4 * u);
+        fill.setColor(Color.rgb(20, 20, 20));
+        c.drawRoundRect(dst, 9 * u, 9 * u, fill);
+
+        float box = 40 * u, bx = cx + cw / 2 - box / 2, by = cy + 22 * u;
+        dst.set(bx, by, bx + box, by + box);
+        fill.setColor(unlocked ? COL_GOLD_DARK : Color.rgb(60, 60, 60));
+        c.drawRoundRect(dst, 6 * u, 6 * u, fill);
+        if (unlocked) drawCheck(c, bx + box * 0.5f, by + box * 0.28f, box * 0.6f, COL_GOLD);
+
+        String nm = nativeBroken ? "" : GameState.achName(id);
+        drawText(c, nm, cx + cw / 2 - textWidth(nm, 3 * u) / 2, by + box + 16 * u, 3 * u);
+
+        java.util.List<String> lines = wrapText(nativeBroken ? "" : GameState.achDesc(id), cw - 44 * u, 2.2f * u, 4);
+        float dy = by + box + 58 * u;
+        for (int i = 0; i < lines.size(); i++)
+            drawText(c, lines.get(i), cx + cw / 2 - textWidth(lines.get(i), 2.2f * u) / 2, dy + i * 22 * u, 2.2f * u);
+
+        String st = unlocked ? "UNLOCKED" : (mx > 1 ? (cur + " OF " + mx) : "LOCKED");
+        drawText(c, st, cx + cw / 2 - textWidth(st, 2.4f * u) / 2, cy + ch - 60 * u, 2.4f * u);
+        drawText(c, "TAP TO CLOSE", cx + cw / 2 - textWidth("TAP TO CLOSE", 2 * u) / 2, cy + ch - 34 * u, 2 * u);
+    }
+
+    // A tap in the achievements list (resolved on UP, once known not to be a drag).
+    private void achTap(float x, float y) {
+        if (achBackR.contains(x, y)) { achMode = false; achSel = -1; return; }
+        if (y < achListTop || y > achListBot) return;
+        for (int i = 0; i < achRowCount && i < achRowR.length; i++)
+            if (achRowR[i].contains(x, y)) { achSel = i; return; }
+    }
+
+    // 'Achievement unlocked' toast: slides down from the top, one at a time.
+    private void drawToasts(Canvas c, int w) {
+        long now = System.nanoTime();
+        if (toastId < 0 && !toastQ.isEmpty()) { toastId = toastQ.poll(); toastAt = now; }
+        if (toastId < 0) return;
+        float el = (now - toastAt) / 1_000_000f;   // ms since it appeared
+        final float DUR = 3200, ANIM = 280;
+        if (el > DUR) { toastId = -1; return; }
+        float p = el < ANIM ? el / ANIM : (el > DUR - ANIM ? (DUR - el) / ANIM : 1f);
+        p = clamp(p, 0, 1);
+        float tw = w * 0.6f, th = 66 * u, tx = w / 2f - tw / 2;
+        float ty = -th + (th + 18 * u) * p;
+        dst.set(tx, ty, tx + tw, ty + th);
+        fill.setColor(COL_GOLD);
+        c.drawRoundRect(dst, 10 * u, 10 * u, fill);
+        dst.set(tx + 3 * u, ty + 3 * u, tx + tw - 3 * u, ty + th - 3 * u);
+        fill.setColor(Color.rgb(26, 20, 8));
+        c.drawRoundRect(dst, 8 * u, 8 * u, fill);
+        drawText(c, "ACHIEVEMENT UNLOCKED", tx + 18 * u, ty + 12 * u, 2 * u);
+        String nm = nativeBroken ? "" : GameState.achName(toastId);
+        drawText(c, nm, tx + 18 * u, ty + 34 * u, 2.6f * u);
     }
 
     // Rewrite one `key = value` line inside a section of the user's zelda3.ini.
@@ -1380,13 +1586,16 @@ public class MinimapView extends View {
             if (settingsTouch) {
                 if (action == MotionEvent.ACTION_MOVE) {
                     if (Math.abs(y - settingsTouchStartY) > 18 * u) settingsScrolling = true;
-                    if (settingsScrolling)
-                        settingsScroll = clamp(settingsScroll + (settingsTouchLastY - y), 0, settingsMaxScroll);
+                    if (settingsScrolling) {
+                        if (achMode) achScroll = clamp(achScroll + (settingsTouchLastY - y), 0, achMaxScroll);
+                        else settingsScroll = clamp(settingsScroll + (settingsTouchLastY - y), 0, settingsMaxScroll);
+                    }
                     settingsTouchLastY = y;
                 } else {
-                    if (action == MotionEvent.ACTION_UP && !settingsScrolling
-                            && tab == TAB_SETTINGS && !remapMode)
-                        settingsTap(x, y);
+                    if (action == MotionEvent.ACTION_UP && !settingsScrolling && tab == TAB_SETTINGS) {
+                        if (achMode) achTap(x, y);
+                        else if (!remapMode) settingsTap(x, y);
+                    }
                     settingsTouch = false;
                 }
             }
@@ -1417,6 +1626,14 @@ public class MinimapView extends View {
                         }
                         return true;
                     }
+                }
+            } else if (achMode) {
+                if (achSel >= 0) { achSel = -1; return true; }   // a tap dismisses the detail card
+                if (mapAreaR.contains(x, y)) {
+                    // taps (open a row / BACK) and drag-scrolling resolve on MOVE/UP
+                    settingsTouch = true;
+                    settingsScrolling = false;
+                    settingsTouchStartY = settingsTouchLastY = y;
                 }
             } else if (mapAreaR.contains(x, y)) {
                 // taps and drag-scrolling in the list are resolved on MOVE/UP
@@ -1494,6 +1711,8 @@ public class MinimapView extends View {
         if (remapArm >= 0 && !nativeBroken) GameState.armButtonCapture(false);
         remapArm = -1;
         remapMode = false;
+        achMode = false;
+        achSel = -1;
         armedRing = 0;   // leaving/changing tabs cancels a pending assignment
     }
 
