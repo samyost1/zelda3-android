@@ -9,6 +9,11 @@
 
 #define CODE(...) #__VA_ARGS__
 
+// Location-themed, framed letterbox chrome for the main window. The Linux
+// build draws it (see second_screen_sdl.c); Android returns NULL so the bars
+// stay black.
+extern const uint32_t *LetterboxBackground(int dw, int dh, int vx, int vy, int vw, int vh);
+
 static SDL_Window *g_window;
 static SDL_GLContext g_context;
 static uint8 *g_screen_buffer;
@@ -18,6 +23,7 @@ static unsigned int g_program, g_VAO;
 static GlTextureWithSize g_texture;
 static GlslShader *g_glsl_shader;
 static bool g_opengl_es;
+static unsigned int g_border_tex;
 
 static void GL_APIENTRY MessageCallback(GLenum source,
                 GLenum type,
@@ -198,6 +204,34 @@ static void OpenGLRenderer_BeginDraw(int width, int height, uint8 **pixels, int 
   *pitch = width * 4;
 }
 
+// Fill the letterbox bars with the location-themed, framed background the
+// Linux frontend produces (opengl.c stays art-agnostic). LetterboxBackground
+// hands back a drawable-sized ARGB image to upload, or NULL when nothing has
+// changed since the last call (keep the texture) or on Android (no chrome).
+static void DrawLetterboxPattern(int dw, int dh, int vx, int vy, int vw, int vh) {
+  const uint32_t *bg = LetterboxBackground(dw, dh, vx, vy, vw, vh);
+  if (bg) {
+    if (!g_border_tex)
+      glGenTextures(1, &g_border_tex);
+    glBindTexture(GL_TEXTURE_2D, g_border_tex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    if (!g_opengl_es)
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_BGRA, dw, dh, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, bg);
+    else
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_BGRA, dw, dh, 0, GL_BGRA, GL_UNSIGNED_BYTE, bg);
+  }
+  if (!g_border_tex)
+    return;  // Android / nothing uploaded -> bars stay black
+  glViewport(0, 0, dw, dh);
+  glUseProgram(g_program);
+  glBindTexture(GL_TEXTURE_2D, g_border_tex);
+  glBindVertexArray(g_VAO);
+  glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+}
+
 static void OpenGLRenderer_EndDraw() {
   int drawable_width, drawable_height;
 
@@ -234,9 +268,14 @@ static void OpenGLRenderer_EndDraw() {
   glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT);
 
+  if (viewport_width < drawable_width || viewport_height < drawable_height)
+    DrawLetterboxPattern(drawable_width, drawable_height,
+                         viewport_x, viewport_y, viewport_width, viewport_height);
+
   if (g_glsl_shader == NULL) {
     glViewport(viewport_x, viewport_y, viewport_width, viewport_height);
     glUseProgram(g_program);
+    glBindTexture(GL_TEXTURE_2D, g_texture.gl_texture);
     int filter = g_config.linear_filtering ? GL_LINEAR : GL_NEAREST;
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
