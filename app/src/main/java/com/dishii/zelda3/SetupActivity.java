@@ -38,11 +38,10 @@ public class SetupActivity extends Activity {
     private static final String ASSETS_DAT = "zelda3_assets.dat";
     private static final String BUNDLED_BPS = "zelda3_assets.bps";
     private static final int REQUEST_PICK_ROM = 1001;
-
-    // A standard headered (.smc) dump is the unheadered ROM plus a 512-byte
-    // copier header; strip it so the patch's CRC check lines up.
-    private static final int ROM_SIZE = 1048576;
-    private static final int COPIER_HEADER = 512;
+    public static final String ACTION_VERIFY_RETROACHIEVEMENTS =
+            "com.dishii.zelda3.action.VERIFY_RETROACHIEVEMENTS";
+    static final String EXTRA_REFRESH_RETROACHIEVEMENTS =
+            "com.dishii.zelda3.extra.REFRESH_RETROACHIEVEMENTS";
 
     private final Handler main = new Handler(Looper.getMainLooper());
 
@@ -50,6 +49,7 @@ public class SetupActivity extends Activity {
     private Button selectButton;
     private ProgressBar spinner;
     private boolean working;
+    private boolean verificationOnly;
 
     // Text/font data pulled from a translated ROM the user picked, waiting for
     // the US ROM so the assets can be built with the translation on top.
@@ -61,7 +61,17 @@ public class SetupActivity extends Activity {
         CrashLog.install(this);
 
         try {
-            if (assetsReady()) {
+            File dir = getExternalFilesDir(null);
+            if (dir != null) {
+                try {
+                    RetroAchievementsConfig.createDefaultIfMissing(
+                            new File(dir, RetroAchievementsConfig.FILE_NAME));
+                } catch (IOException e) {
+                    Log.w(TAG, "Couldn't create RetroAchievements config template", e);
+                }
+            }
+            verificationOnly = ACTION_VERIFY_RETROACHIEVEMENTS.equals(getIntent().getAction());
+            if (assetsReady() && !verificationOnly) {
                 launchGame();
                 return;
             }
@@ -109,6 +119,9 @@ public class SetupActivity extends Activity {
 
     private void launchGame() {
         Intent intent = new Intent(this, MainActivity.class);
+        if (verificationOnly) {
+            intent.putExtra(EXTRA_REFRESH_RETROACHIEVEMENTS, true);
+        }
         int display = swapDisplayId();
         if (display != -1 && Build.VERSION.SDK_INT >= 26) {
             android.app.ActivityOptions options = android.app.ActivityOptions.makeBasic();
@@ -180,14 +193,17 @@ public class SetupActivity extends Activity {
         root.setPadding(pad, pad, pad, pad);
 
         TextView title = new TextView(this);
-        title.setText("Welcome to Zelda 3");
+        title.setText(verificationOnly ? "Verify ROM for RetroAchievements" : "Welcome to Zelda 3");
         title.setTextColor(Color.WHITE);
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 26);
         title.setGravity(Gravity.CENTER);
         root.addView(title);
 
         TextView blurb = new TextView(this);
-        blurb.setText("This game needs assets from your own copy of "
+        blurb.setText(verificationOnly
+                ? "Select your original US ROM to verify it for RetroAchievements. "
+                + "The ROM is read to calculate its hash, then discarded."
+                : "This game needs assets from your own copy of "
                 + "“The Legend of Zelda: A Link to the Past”.\n\n"
                 + "Select your ROM file below. It's read once to build the game "
                 + "assets — the ROM itself is never copied or kept.\n\n"
@@ -203,7 +219,7 @@ public class SetupActivity extends Activity {
         root.addView(blurb);
 
         selectButton = new Button(this);
-        selectButton.setText("Select ROM");
+        selectButton.setText(verificationOnly ? "Select Original US ROM" : "Select ROM");
         selectButton.setAllCaps(false);
         selectButton.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
         LinearLayout.LayoutParams btnLp = new LinearLayout.LayoutParams(
@@ -262,7 +278,55 @@ public class SetupActivity extends Activity {
                 || data.getData() == null) {
             return;
         }
-        extractInBackground(data.getData());
+        if (verificationOnly) {
+            verifyInBackground(data.getData());
+        } else {
+            extractInBackground(data.getData());
+        }
+    }
+
+    private void verifyInBackground(final Uri romUri) {
+        if (working) {
+            return;
+        }
+        working = true;
+        setStatus("");
+        spinner.setVisibility(View.VISIBLE);
+        selectButton.setEnabled(false);
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                String error = null;
+                try {
+                    byte[] rom = RomVerification.stripCopierHeader(readUri(romUri));
+                    if (!RomVerification.isCanonicalOriginal(rom, readAsset(BUNDLED_BPS))) {
+                        error = "RetroAchievements requires the original unpatched US ROM "
+                                + "(1,048,576 bytes).";
+                    } else {
+                        new RetroAchievementsStorage(SetupActivity.this)
+                                .saveVerifiedRomHash(RomVerification.CANONICAL_US_MD5);
+                    }
+                } catch (IOException e) {
+                    Log.e(TAG, "ROM verification failed", e);
+                    error = "Couldn't read that file: " + e.getMessage();
+                }
+                final String resultError = error;
+                main.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        working = false;
+                        spinner.setVisibility(View.GONE);
+                        selectButton.setEnabled(true);
+                        if (resultError != null) {
+                            setStatus(resultError);
+                        } else {
+                            launchGame();
+                        }
+                    }
+                });
+            }
+        }, "rom-verify").start();
     }
 
     private void extractInBackground(final Uri romUri) {
@@ -326,7 +390,7 @@ public class SetupActivity extends Activity {
         dir.mkdirs();
 
         byte[] rom = readUri(romUri);
-        rom = stripCopierHeader(rom);
+        rom = RomVerification.stripCopierHeader(rom);
 
         byte[] bps = readAsset(BUNDLED_BPS);
         if (!BpsPatcher.matchesSource(rom, bps)) {
@@ -335,6 +399,7 @@ public class SetupActivity extends Activity {
                     + "Now select your original (unpatched) US ROM so the rest "
                     + "of the game data can be built.";
         }
+        boolean canonicalRom = RomVerification.isCanonicalOriginal(rom, bps);
         byte[] dat = BpsPatcher.apply(rom, bps);
         if (pendingTranslation != null) {
             dat = TranslationExtractor.addLanguage(dat, pendingTranslation);
@@ -360,6 +425,9 @@ public class SetupActivity extends Activity {
             }
         }
         Log.i(TAG, "Wrote " + out + " (" + dat.length + " bytes)");
+        if (canonicalRom) {
+            new RetroAchievementsStorage(this).saveVerifiedRomHash(RomVerification.CANONICAL_US_MD5);
+        }
 
         if (pendingTranslation != null) {
             // The assets are already on disk at this point, so a failure to
@@ -432,16 +500,6 @@ public class SetupActivity extends Activity {
             fos.close();
         }
         Log.i(TAG, "Set " + line + " in " + ini);
-    }
-
-    // Drop a 512-byte SNES copier header if the file carries one.
-    private byte[] stripCopierHeader(byte[] rom) {
-        if (rom.length == ROM_SIZE + COPIER_HEADER && (rom.length % 1024) == COPIER_HEADER) {
-            byte[] trimmed = new byte[ROM_SIZE];
-            System.arraycopy(rom, COPIER_HEADER, trimmed, 0, ROM_SIZE);
-            return trimmed;
-        }
-        return rom;
     }
 
     private byte[] readUri(Uri uri) throws IOException {

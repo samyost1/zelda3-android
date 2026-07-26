@@ -1,6 +1,7 @@
 package com.dishii.zelda3;
 
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.BitmapShader;
@@ -22,7 +23,10 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -144,7 +148,8 @@ public class MinimapView extends View {
     // touch regions (recomputed during draw)
     private final RectF tabItemsR = new RectF(), tabGearR = new RectF(), tabMapR = new RectF();
     private final RectF tabSettingsR = new RectF(), remapBackR = new RectF();
-    private final RectF[] settingsRowR = new RectF[12 + FEAT_MASKS.length];
+    private final RectF raBackR = new RectF(), raLogoutR = new RectF(), raVerifyR = new RectF();
+    private final RectF[] settingsRowR = new RectF[13 + FEAT_MASKS.length];
     private final RectF[] remapRowR = new RectF[12];
     private final RectF mapAreaR = new RectF(), yRingR = new RectF(), xRingR = new RectF();
 
@@ -154,6 +159,13 @@ public class MinimapView extends View {
     private boolean settingsTouch, settingsScrolling;
     private float settingsTouchStartY, settingsTouchLastY;
     private boolean remapMode = false;
+    private boolean raMode = false;
+    private float raScroll, raMaxScroll, raListTop, raListBot;
+    private boolean raTouch, raScrolling;
+    private float raTouchStartY, raTouchLastY;
+    private long raModelAt;
+    private RetroAchievementsUiModel raModel;
+    private float raListLeft, raListRight;
     private int remapArm = -1;          // command index waiting for a button press
     private long remapArmAt;
     private final int[] padControls = new int[12];
@@ -977,6 +989,10 @@ public class MinimapView extends View {
             drawStatesPanel(c, r);
             return;
         }
+        if (raMode) {
+            drawRaPanel(c, r);
+            return;
+        }
         drawText(c, "SETTINGS", r.centerX() - textWidth("SETTINGS", 3 * u) / 2, r.top + 18 * u, 3 * u);
 
         boolean ws = false, crt = false, hudHidden = false;
@@ -1026,8 +1042,9 @@ public class MinimapView extends View {
                 v = !msuPack ? "NO PACK"
                         : msuOn != msuOnApplied ? "RESTART" : (msuOn ? "ON" : "OFF");
             }
+            else if (i == 12) { label = "RETROACHIEVEMENTS"; v = null; }
             else {
-                int f = i - 12;
+                int f = i - 13;
                 label = FEAT_LABELS[f];
                 v = (((feats & FEAT_MASKS[f]) != 0) ^ FEAT_INVERT[f]) ? "ON" : "OFF";
             }
@@ -1124,8 +1141,11 @@ public class MinimapView extends View {
                 // playing over a paused SPC - so this waits for a restart too
                 msuOn = !msuOn;
                 updateIni("[Sound]", "EnableMSU", msuOn ? msuOnValue : "false");
+            } else if (i == 12) {
+                raMode = true;
+                raModelAt = 0;
             } else {
-                int f = i - 12;
+                int f = i - 13;
                 boolean on = (GameState.getFeatures() & FEAT_MASKS[f]) == 0;
                 GameState.setFeature(FEAT_MASKS[f], on);
                 updateIni(FEAT_SECTIONS[f], FEAT_KEYS[f], on ? "1" : "0");
@@ -1139,6 +1159,183 @@ public class MinimapView extends View {
             }
             return;
         }
+    }
+
+    private void drawRaPanel(Canvas c, RectF r) {
+        long now = System.nanoTime();
+        if (raModel == null || now - raModelAt > 1_000_000_000L) {
+            try {
+                raModel = RetroAchievementsBridge.uiModel();
+            } catch (UnsatisfiedLinkError ignored) {
+                raModel = new RetroAchievementsUiModel();
+                raModel.status = "error";
+            }
+            raModelAt = now;
+        }
+        RetroAchievementsUiModel model = raModel;
+        raBackR.set(r.left + 18 * u, r.top + 12 * u, r.left + 112 * u, r.top + 50 * u);
+        drawRaAction(c, raBackR, "BACK", false);
+        raLogoutR.set(r.right - 150 * u, r.top + 12 * u, r.right - 18 * u, r.top + 50 * u);
+        drawRaAction(c, raLogoutR, "LOG OUT", !"disabled".equals(model.mode));
+        raVerifyR.set(r.right - 292 * u, r.top + 12 * u, r.right - 158 * u, r.top + 50 * u);
+        if ("unverified".equals(model.status)) drawRaAction(c, raVerifyR, "VERIFY ROM", true);
+        else raVerifyR.setEmpty();
+        drawText(c, "RETROACHIEVEMENTS",
+                r.centerX() - textWidth("RETROACHIEVEMENTS", 3 * u) / 2, r.top + 60 * u, 3 * u);
+
+        String mode = model.mode.toUpperCase();
+        String status = raStatus(model);
+        drawText(c, fitText(mode + "  " + status, r.width() - 260 * u, 2.2f * u),
+                r.left + 24 * u, r.top + 94 * u, 2.2f * u);
+        String game = model.gameTitle.length() == 0 ? "NO VERIFIED GAME" :
+                raText(model.gameTitle) + "  #" + model.gameId;
+        drawText(c, fitText(game, r.width() - 48 * u, 2.6f * u),
+                r.left + 24 * u, r.top + 126 * u, 2.6f * u);
+        String user = model.username.length() == 0 ? "USER: --" : "USER: " + raText(model.username);
+        String summary = user + "    " + model.unlocked + "/" + model.core + " CORE    RP " + model.rp;
+        drawText(c, fitText(summary, r.width() - 48 * u, 2.1f * u),
+                r.left + 24 * u, r.top + 158 * u, 2.1f * u);
+        String presence = model.richPresence.length() == 0 ? "RICH PRESENCE: --" :
+                "RICH PRESENCE: " + raText(model.richPresence);
+        drawText(c, fitText(presence, r.width() - 48 * u, 1.9f * u),
+                r.left + 24 * u, r.top + 188 * u, 1.9f * u);
+        String event = model.lastEvent.length() == 0 ? "LAST EVENT: --" :
+                "LAST EVENT: " + raText(model.lastEvent);
+        drawText(c, fitText(event, r.width() - 48 * u, 1.9f * u),
+                r.left + 24 * u, r.top + 215 * u, 1.9f * u);
+
+        raListTop = r.top + 244 * u;
+        raListBot = r.bottom - 14 * u;
+        raListLeft = r.left + 14 * u;
+        raListRight = r.right - 14 * u;
+        float contentH = 0;
+        String previousBucket = null;
+        for (RetroAchievementsUiModel.Achievement achievement : model.achievements) {
+            if (!achievement.bucket.equals(previousBucket)) {
+                contentH += 28 * u;
+                previousBucket = achievement.bucket;
+            }
+            contentH += raAchievementHeight(achievement, r);
+        }
+        raMaxScroll = Math.max(0, contentH - (raListBot - raListTop));
+        raScroll = clamp(raScroll, 0, raMaxScroll);
+        c.save();
+        c.clipRect(raListLeft, raListTop, raListRight, raListBot);
+        float y = raListTop - raScroll;
+        previousBucket = null;
+        for (RetroAchievementsUiModel.Achievement achievement : model.achievements) {
+            if (!achievement.bucket.equals(previousBucket)) {
+                drawText(c, fitText(achievement.bucket.toUpperCase(), r.width() - 48 * u, 1.9f * u),
+                        r.left + 24 * u, y + 2 * u, 1.9f * u);
+                y += 28 * u;
+                previousBucket = achievement.bucket;
+            }
+            float height = raAchievementHeight(achievement, r);
+            if (y + height >= raListTop && y <= raListBot) {
+                stroke.setStrokeWidth(2 * u);
+                stroke.setColor(COL_GOLD_DARK);
+                c.drawLine(r.left + 24 * u, y + height - 4 * u, r.right - 24 * u, y + height - 4 * u, stroke);
+                String state = achievement.unlocked ? "DONE" : "OPEN";
+                String points = state + "  " + achievement.points + "P";
+                drawText(c, points, r.right - 24 * u - textWidth(points, 1.8f * u),
+                        y + 6 * u, 1.8f * u);
+                float textY = y + 4 * u;
+                for (String title : wrapRaText(raText(achievement.title),
+                        r.width() - 220 * u, 2.1f * u, 2)) {
+                    drawText(c, title, r.left + 24 * u, textY, 2.1f * u);
+                    textY += 20 * u;
+                }
+                for (String description : wrapRaText(raText(achievement.description),
+                        r.width() - 48 * u, 1.7f * u, 2)) {
+                    drawText(c, description, r.left + 24 * u, textY, 1.7f * u);
+                    textY += 18 * u;
+                }
+                if (achievement.progress.length() > 0) {
+                    String progress = "PROGRESS: " + raText(achievement.progress);
+                    drawText(c, fitText(progress, r.width() - 48 * u, 1.6f * u),
+                            r.left + 24 * u, textY, 1.6f * u);
+                }
+            }
+            y += height;
+        }
+        c.restore();
+        if (model.achievements.isEmpty()) {
+            drawText(c, "ACHIEVEMENTS WILL APPEAR AFTER THE VERIFIED GAME LOADS.",
+                    r.left + 24 * u, raListTop + 18 * u, 1.9f * u);
+        }
+    }
+
+    private float raAchievementHeight(RetroAchievementsUiModel.Achievement achievement, RectF r) {
+        return 12 * u + wrapRaText(raText(achievement.title),
+                r.width() - 220 * u, 2.1f * u, 2).size() * 20 * u
+                + wrapRaText(raText(achievement.description),
+                r.width() - 48 * u, 1.7f * u, 2).size() * 18 * u
+                + (achievement.progress.length() == 0 ? 0 : 18 * u);
+    }
+
+    private String raText(String text) {
+        return text.toUpperCase(Locale.US);
+    }
+
+    private List<String> wrapRaText(String text, float maxWidth, float size, int maxLines) {
+        ArrayList<String> lines = new ArrayList<>();
+        StringBuilder line = new StringBuilder();
+        for (String word : text.trim().split("\\s+")) {
+            String next = line.length() == 0 ? word : line + " " + word;
+            if (textWidth(next, size) <= maxWidth) {
+                line.setLength(0);
+                line.append(next);
+            } else if (line.length() == 0) {
+                lines.add(fitText(word, maxWidth, size));
+            } else {
+                lines.add(line.toString());
+                line.setLength(0);
+                line.append(word);
+            }
+            if (lines.size() == maxLines) return lines;
+        }
+        if (line.length() > 0 && lines.size() < maxLines) lines.add(line.toString());
+        if (lines.isEmpty()) lines.add("");
+        return lines;
+    }
+
+    private String raStatus(RetroAchievementsUiModel model) {
+        if ("unverified".equals(model.status)) return "VERIFY THE ORIGINAL US ROM";
+        if ("disabled".equals(model.status)) return "DISABLED OR NOT CONFIGURED";
+        if ("disconnected".equals(model.status)) return "OFFLINE - RETRYING";
+        if ("error".equals(model.status)) return "CHECK CONNECTION AND CREDENTIALS";
+        if ("connecting".equals(model.status)) return "CONNECTING";
+        if ("loading".equals(model.status)) return "LOADING GAME";
+        return "CONNECTED";
+    }
+
+    private void drawRaAction(Canvas c, RectF r, String label, boolean enabled) {
+        fill.setColor(enabled ? Color.rgb(58, 48, 12) : Color.rgb(28, 28, 28));
+        c.drawRoundRect(r, 8 * u, 8 * u, fill);
+        stroke.setStrokeWidth(2 * u);
+        stroke.setColor(enabled ? COL_GOLD : COL_GOLD_DARK);
+        c.drawRoundRect(r, 8 * u, 8 * u, stroke);
+        drawText(c, label, r.centerX() - textWidth(label, 1.7f * u) / 2,
+                r.centerY() - 7 * u, 1.7f * u);
+    }
+
+    private String fitText(String text, float maxWidth, float size) {
+        if (textWidth(text, size) <= maxWidth) return text;
+        String suffix = "...";
+        int end = text.length();
+        while (end > 0 && textWidth(text.substring(0, end) + suffix, size) > maxWidth) end--;
+        return end == 0 ? suffix : text.substring(0, end) + suffix;
+    }
+
+    private void launchRaVerification() {
+        Intent intent = new Intent(getContext(), SetupActivity.class)
+                .setAction(SetupActivity.ACTION_VERIFY_RETROACHIEVEMENTS);
+        if (!(getContext() instanceof android.app.Activity)) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        }
+        try {
+            getContext().startActivity(intent);
+        } catch (RuntimeException ignored) {}
     }
 
     private void drawRemapPanel(Canvas c, RectF r) {
@@ -1985,6 +2182,16 @@ public class MinimapView extends View {
                     settingsTouch = false;
                 }
             }
+            if (raTouch) {
+                if (action == MotionEvent.ACTION_MOVE) {
+                    if (Math.abs(y - raTouchStartY) > 18 * u) raScrolling = true;
+                    if (raScrolling)
+                        raScroll = clamp(raScroll + (raTouchLastY - y), 0, raMaxScroll);
+                    raTouchLastY = y;
+                } else {
+                    raTouch = false;
+                }
+            }
             if (mapTouch) {
                 if (action == MotionEvent.ACTION_MOVE) {
                     // a drag is neither a tap nor a long press
@@ -2039,6 +2246,24 @@ public class MinimapView extends View {
                         return true;
                     }
                 }
+            } else if (raMode) {
+                if (raBackR.contains(x, y)) { leaveSubPanel(); return true; }
+                if (!raVerifyR.isEmpty() && raVerifyR.contains(x, y)) {
+                    launchRaVerification();
+                    return true;
+                }
+                if (raLogoutR.contains(x, y) && raModel != null
+                        && !"disabled".equals(raModel.mode)) {
+                    RetroAchievementsBridge.logout(getContext());
+                    raModelAt = 0;
+                    return true;
+                }
+                if (x >= raListLeft && x <= raListRight && y >= raListTop && y <= raListBot) {
+                    raTouch = true;
+                    raScrolling = false;
+                    raTouchStartY = raTouchLastY = y;
+                }
+                return true;
             } else if (mapAreaR.contains(x, y)) {
                 // taps and drag-scrolling in the list are resolved on MOVE/UP
                 settingsTouch = true;
@@ -2121,8 +2346,11 @@ public class MinimapView extends View {
         remapArm = -1;
         remapMode = false;
         statesMode = false;
+        raMode = false;
         statesTouch = false;
         statesScroll = 0;
+        raTouch = false;
+        raScroll = 0;
         armedRing = 0;   // leaving/changing tabs cancels a pending assignment
     }
 

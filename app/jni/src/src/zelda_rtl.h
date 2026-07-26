@@ -58,6 +58,7 @@ bool ZeldaIsPlayingMusicTrack(uint8 track);
 uint8 ZeldaGetEntranceMusicTrack(int track);
 void ZeldaSetLanguage(const char *language);
 void PatchCommand(char cmd);
+void ZeldaStopReplayForIntegrity(void);
 
 // Things for state management
 

@@ -15,6 +15,10 @@ captures/
 *.apk
 output.json
 
+# Native desktop build artifacts
+*.o
+app/jni/src/zelda3
+
 # IntelliJ
 *.iml
 .idea/
@@ -32,3 +36,9 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# Local RetroAchievements credentials and ROM fixtures
+test-secrets/
+**/retroachievements.ini
+*.sfc
+*.smc

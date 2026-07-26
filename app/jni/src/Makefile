@@ -1,9 +1,32 @@
 TARGET_EXEC:=zelda3
 ROM:=tables/zelda3.sfc
-SRCS:=$(wildcard src/*.c src/platform/linux/*.c snes/*.c) third_party/gl_core/gl_core_3_1.c third_party/opus-1.3.1-stripped/opus_decoder_amalgam.c
+RCHEEVOS_CLIENT_SRCS:= \
+	third_party/rcheevos/src/rc_client.c \
+	third_party/rcheevos/src/rc_compat.c \
+	third_party/rcheevos/src/rc_util.c \
+	third_party/rcheevos/src/rc_version.c \
+	third_party/rcheevos/src/rapi/rc_api_common.c \
+	third_party/rcheevos/src/rapi/rc_api_info.c \
+	third_party/rcheevos/src/rapi/rc_api_runtime.c \
+	third_party/rcheevos/src/rapi/rc_api_user.c \
+	third_party/rcheevos/src/rcheevos/alloc.c \
+	third_party/rcheevos/src/rcheevos/condition.c \
+	third_party/rcheevos/src/rcheevos/condset.c \
+	third_party/rcheevos/src/rcheevos/consoleinfo.c \
+	third_party/rcheevos/src/rcheevos/format.c \
+	third_party/rcheevos/src/rcheevos/lboard.c \
+	third_party/rcheevos/src/rcheevos/memref.c \
+	third_party/rcheevos/src/rcheevos/operand.c \
+	third_party/rcheevos/src/rcheevos/richpresence.c \
+	third_party/rcheevos/src/rcheevos/runtime.c \
+	third_party/rcheevos/src/rcheevos/runtime_progress.c \
+	third_party/rcheevos/src/rcheevos/trigger.c \
+	third_party/rcheevos/src/rcheevos/value.c \
+	third_party/rcheevos/src/rhash/md5.c
+SRCS:=$(wildcard src/*.c src/platform/linux/*.c snes/*.c) third_party/gl_core/gl_core_3_1.c third_party/opus-1.3.1-stripped/opus_decoder_amalgam.c $(RCHEEVOS_CLIENT_SRCS)
 OBJS:=$(SRCS:%.c=%.o)
 PYTHON:=/usr/bin/env python3
-CFLAGS:=$(if $(CFLAGS),$(CFLAGS),-O2 -Werror) -I .
+CFLAGS:=$(if $(CFLAGS),$(CFLAGS),-O2 -Werror) -I . -I third_party/rcheevos/include
 CFLAGS:=${CFLAGS} $(shell sdl2-config --cflags) -DSYSTEM_VOLUME_MIXER_AVAILABLE=0
 
 ifeq (${OS},Windows_NT)

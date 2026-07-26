@@ -28,6 +28,7 @@
 #include "util.h"
 #include "audio.h"
 #include "android_logging.h"
+#include "ra_client_zelda3.h"
 
 static bool g_run_without_emu = 0;
 
@@ -527,6 +528,7 @@ int main(int argc, char** argv) {
 #endif
 
   ZeldaReadSram();
+  RaClientZelda3_Initialize();
 
   for (int i = 0; i < SDL_NumJoysticks(); i++)
     OpenOneGamepad(i);
@@ -583,6 +585,13 @@ int main(int argc, char** argv) {
       }
     }
 
+    RaClientZelda3_Pump();
+    if (RaClientZelda3_IsCasualIntegrityEnabled()) {
+      SDL_LockMutex(g_audio_mutex);
+      ZeldaStopReplayForIntegrity();
+      SDL_UnlockMutex(g_audio_mutex);
+    }
+
     if (g_paused != audiopaused) {
       audiopaused = g_paused;
       if (device)
@@ -590,6 +599,7 @@ int main(int argc, char** argv) {
     }
 
     if (g_paused) {
+      RaClientZelda3_Idle();
       SDL_Delay(16);
       continue;
     }
@@ -607,6 +617,7 @@ int main(int argc, char** argv) {
     bool is_replay = ZeldaRunFrame(inputs);
     SDL_UnlockMutex(g_audio_mutex);
 
+    RaClientZelda3_DoFrame();
     frameCtr++;
 
     if ((g_turbo ^ (is_replay & g_replay_turbo)) && (frameCtr & (g_turbo ? 0xf : 0x7f)) != 0) {
@@ -644,6 +655,8 @@ int main(int argc, char** argv) {
   }
   if (g_config.autosave)
     HandleCommand(kKeys_Save + 0, true);
+
+  RaClientZelda3_Shutdown();
 
   // clean sdl
   if (g_config.enable_audio) {
@@ -749,17 +762,27 @@ static void HandleCommand_Locked(uint32 j, bool pressed) {
   } else if (j <= kKeys_Save_Last) {
     SaveLoadSlot(kSaveLoad_Save, j - kKeys_Save);
   } else if (j <= kKeys_Replay_Last) {
-    SaveLoadSlot(kSaveLoad_Replay, j - kKeys_Replay);
+    if (!RaClientZelda3_IsCasualIntegrityEnabled())
+      SaveLoadSlot(kSaveLoad_Replay, j - kKeys_Replay);
   } else if (j <= kKeys_LoadRef_Last) {
     SaveLoadSlot(kSaveLoad_Load, 256 + j - kKeys_LoadRef);
   } else if (j <= kKeys_ReplayRef_Last) {
-    SaveLoadSlot(kSaveLoad_Replay, 256 + j - kKeys_ReplayRef);
+    if (!RaClientZelda3_IsCasualIntegrityEnabled())
+      SaveLoadSlot(kSaveLoad_Replay, 256 + j - kKeys_ReplayRef);
   } else {
     switch (j) {
-    case kKeys_CheatLife: PatchCommand('w'); break;
-    case kKeys_CheatEquipment: PatchCommand('W'); break;
-    case kKeys_CheatKeys: PatchCommand('o'); break;
-    case kKeys_CheatWalkThroughWalls: PatchCommand('E'); break;
+    case kKeys_CheatLife:
+      if (!RaClientZelda3_IsCasualIntegrityEnabled()) PatchCommand('w');
+      break;
+    case kKeys_CheatEquipment:
+      if (!RaClientZelda3_IsCasualIntegrityEnabled()) PatchCommand('W');
+      break;
+    case kKeys_CheatKeys:
+      if (!RaClientZelda3_IsCasualIntegrityEnabled()) PatchCommand('o');
+      break;
+    case kKeys_CheatWalkThroughWalls:
+      if (!RaClientZelda3_IsCasualIntegrityEnabled()) PatchCommand('E');
+      break;
     case kKeys_ClearKeyLog: PatchCommand('k'); break;
     case kKeys_StopReplay: PatchCommand('l'); break;
     case kKeys_Fullscreen:
@@ -770,6 +793,7 @@ static void HandleCommand_Locked(uint32 j, bool pressed) {
       break;
     case kKeys_Reset:
       ZeldaReset(true);
+      RaClientZelda3_Reset();
       break;
     case kKeys_Pause: g_paused = !g_paused; break;
     case kKeys_PauseDimmed:
