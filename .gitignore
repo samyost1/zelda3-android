@@ -32,3 +32,14 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# Game ROMs and anything extracted from one. The app reads the user's own ROM at
+# runtime and ships only a delta patch, so no ROM-derived data belongs in here.
+rom_data/
+*.sfc
+*.smc
+*.gba
+*.nes
+*.z64
+*.rom
+zelda3_assets.dat
