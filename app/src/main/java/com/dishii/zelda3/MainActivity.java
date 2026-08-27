@@ -11,6 +11,10 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.view.Display;
+import android.view.KeyEvent;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.RelativeLayout;
 import android.widget.Toast;
 import java.io.File;
 import java.io.IOException;
@@ -29,6 +33,10 @@ public class MainActivity extends SDLActivity {
     // activity left the foreground; tells the dismiss-recovery logic not to
     // re-show it until onStart.
     private boolean secondScreenHidden;
+
+    private MinimapView fullMapOverlay;
+    private boolean fullMapVisible = false;
+    private boolean selectHeld = false;
 
     private final DisplayManager.DisplayListener displayListener =
             new DisplayManager.DisplayListener() {
@@ -72,6 +80,16 @@ public class MainActivity extends SDLActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         CrashLog.install(this);
+
+        fullMapOverlay = new MinimapView(this);
+        fullMapOverlay.setVisibility(View.GONE);
+        // Don't let the overlay steal input focus from the SDL surface.
+        fullMapOverlay.setFocusable(false);
+        fullMapOverlay.setFocusableInTouchMode(false);
+        ViewGroup root = (ViewGroup) SDLActivity.getContentView();
+        root.addView(fullMapOverlay, new RelativeLayout.LayoutParams(
+                RelativeLayout.LayoutParams.MATCH_PARENT,
+                RelativeLayout.LayoutParams.MATCH_PARENT));
 
         // None of the second-screen setup is worth dying for: if any of it
         // throws on unfamiliar hardware (issue #19: instant close at launch on
@@ -284,5 +302,29 @@ public class MainActivity extends SDLActivity {
     private boolean isExternalStorageWritable() {
         String state = Environment.getExternalStorageState();
         return Environment.MEDIA_MOUNTED.equals(state);
+    }
+
+    @Override
+    public boolean dispatchKeyEvent(KeyEvent event) {
+        int keyCode = event.getKeyCode();
+
+        if (keyCode == KeyEvent.KEYCODE_BUTTON_SELECT) {
+            selectHeld = (event.getAction() == KeyEvent.ACTION_DOWN);
+        }
+
+        if (selectHeld
+                && keyCode == KeyEvent.KEYCODE_BUTTON_Y
+                && event.getAction() == KeyEvent.ACTION_DOWN
+                && event.getRepeatCount() == 0) {
+            toggleFullMap();
+            return true; // consume — don't let this reach the game
+        }
+
+        return super.dispatchKeyEvent(event);
+    }
+
+    private void toggleFullMap() {
+        fullMapVisible = !fullMapVisible;
+        fullMapOverlay.setVisibility(fullMapVisible ? View.VISIBLE : View.GONE);
     }
 }
