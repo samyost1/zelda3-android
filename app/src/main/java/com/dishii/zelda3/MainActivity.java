@@ -36,7 +36,7 @@ public class MainActivity extends SDLActivity {
 
     private MinimapView fullMapOverlay;
     private boolean fullMapVisible = false;
-    private boolean selectHeld = false;
+    private int mapToggleKeyCode = -1; // resolved from ini at startup; -1 = disabled
 
     private final DisplayManager.DisplayListener displayListener =
             new DisplayManager.DisplayListener() {
@@ -154,6 +154,8 @@ public class MainActivity extends SDLActivity {
 
             }
         }
+
+        mapToggleKeyCode = resolveMapToggleButton();
     }
 
     @Override
@@ -306,21 +308,66 @@ public class MainActivity extends SDLActivity {
 
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
-        int keyCode = event.getKeyCode();
-
-        if (keyCode == KeyEvent.KEYCODE_BUTTON_SELECT) {
-            selectHeld = (event.getAction() == KeyEvent.ACTION_DOWN);
-        }
-
-        if (selectHeld
-                && keyCode == KeyEvent.KEYCODE_BUTTON_Y
+        if (mapToggleKeyCode >= 0
+                && event.getKeyCode() == mapToggleKeyCode
                 && event.getAction() == KeyEvent.ACTION_DOWN
                 && event.getRepeatCount() == 0) {
             toggleFullMap();
             return true; // consume — don't let this reach the game
         }
-
         return super.dispatchKeyEvent(event);
+    }
+
+    /**
+     * Read MapToggleButton from [Android] in zelda3.ini and return the
+     * corresponding Android KeyEvent keycode, or -1 if absent/unrecognised.
+     */
+    private int resolveMapToggleButton() {
+        String name = readIniValue("[Android]", "MapToggleButton");
+        if (name == null || name.isEmpty()) return -1;
+        switch (name.trim()) {
+            case "A":         return KeyEvent.KEYCODE_BUTTON_A;
+            case "B":         return KeyEvent.KEYCODE_BUTTON_B;
+            case "X":         return KeyEvent.KEYCODE_BUTTON_X;
+            case "Y":         return KeyEvent.KEYCODE_BUTTON_Y;
+            case "Back":      return KeyEvent.KEYCODE_BUTTON_SELECT;
+            case "Guide":     return KeyEvent.KEYCODE_BUTTON_MODE;
+            case "Start":     return KeyEvent.KEYCODE_BUTTON_START;
+            case "L3":        return KeyEvent.KEYCODE_BUTTON_THUMBL;
+            case "R3":        return KeyEvent.KEYCODE_BUTTON_THUMBR;
+            case "L1": case "Lb": return KeyEvent.KEYCODE_BUTTON_L1;
+            case "R1": case "Rb": return KeyEvent.KEYCODE_BUTTON_R1;
+            case "DpadUp":    return KeyEvent.KEYCODE_DPAD_UP;
+            case "DpadDown":  return KeyEvent.KEYCODE_DPAD_DOWN;
+            case "DpadLeft":  return KeyEvent.KEYCODE_DPAD_LEFT;
+            case "DpadRight": return KeyEvent.KEYCODE_DPAD_RIGHT;
+            default:          return -1;
+        }
+    }
+
+    /** Read one key = value from a section of the user's zelda3.ini. */
+    private String readIniValue(String section, String key) {
+        try {
+            java.io.File dir = getExternalFilesDir(null);
+            if (dir == null) return null;
+            java.io.File f = new java.io.File(dir, "zelda3.ini");
+            java.io.BufferedReader in = new java.io.BufferedReader(new java.io.FileReader(f));
+            String line, cur = "", v = null;
+            while ((line = in.readLine()) != null) {
+                String t = line.trim();
+                if (t.startsWith("[")) cur = t;
+                else if (cur.equalsIgnoreCase(section)
+                        && t.toLowerCase().startsWith(key.toLowerCase())
+                        && t.length() > key.length()
+                        && t.substring(key.length()).trim().startsWith("=")) {
+                    v = t.substring(t.indexOf('=') + 1).trim();
+                }
+            }
+            in.close();
+            return v;
+        } catch (java.io.IOException e) {
+            return null;
+        }
     }
 
     private void toggleFullMap() {
