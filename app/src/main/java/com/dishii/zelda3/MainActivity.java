@@ -337,6 +337,8 @@ public class MainActivity extends SDLActivity {
             case "R3":        return KeyEvent.KEYCODE_BUTTON_THUMBR;
             case "L1": case "Lb": return KeyEvent.KEYCODE_BUTTON_L1;
             case "R1": case "Rb": return KeyEvent.KEYCODE_BUTTON_R1;
+            case "L2":        return KeyEvent.KEYCODE_BUTTON_L2;
+            case "R2":        return KeyEvent.KEYCODE_BUTTON_R2;
             case "DpadUp":    return KeyEvent.KEYCODE_DPAD_UP;
             case "DpadDown":  return KeyEvent.KEYCODE_DPAD_DOWN;
             case "DpadLeft":  return KeyEvent.KEYCODE_DPAD_LEFT;
