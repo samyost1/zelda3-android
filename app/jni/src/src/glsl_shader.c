@@ -417,7 +417,13 @@ GlslShader *GlslShader_CreateFromFile(const char *filename, bool opengl_es) {
     if (t->filename) {
       char *new_filename = ReplaceFilenameWithNewPath(filename, t->filename);
       int imw, imh, imn;
-      unsigned char *data = stbi_load(new_filename, &imw, &imh, &imn, 0);
+      // Use ReadWholeFile so the Android path resolves correctly to external storage.
+      size_t png_size = 0;
+      unsigned char *png_data = ReadWholeFile(new_filename, &png_size);
+      unsigned char *data = png_data
+          ? stbi_load_from_memory(png_data, (int)png_size, &imw, &imh, &imn, 0)
+          : NULL;
+      free(png_data);
       if (!data) {
         fprintf(stderr, "Unable to read PNG '%s'\n", new_filename);
       } else {

@@ -14,6 +14,6 @@ LOCAL_SRC_FILES := $(wildcard $(LOCAL_PATH)/src/*.c $(LOCAL_PATH)/src/platform/a
 
 LOCAL_SHARED_LIBRARIES := SDL2 SDL2_mixer
 
-LOCAL_LDLIBS := -lGLESv1_CM -lGLESv2 -lOpenSLES -llog -landroid
+LOCAL_LDLIBS := -lGLESv1_CM -lGLESv2 -lEGL -lOpenSLES -llog -landroid
 
 include $(BUILD_SHARED_LIBRARY)

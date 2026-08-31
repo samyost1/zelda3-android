@@ -2,6 +2,9 @@
 #include <SDL.h>
 #include <stdio.h>
 #include <stdbool.h>
+#ifdef __ANDROID__
+#include <EGL/egl.h>
+#endif
 #include "types.h"
 #include "util.h"
 #include "glsl_shader.h"
@@ -240,7 +243,28 @@ static void OpenGLRenderer_EndDraw() {
   int drawable_width, drawable_height;
 
   SDL_GL_GetDrawableSize(g_window, &drawable_width, &drawable_height);
-  
+
+#ifdef __ANDROID__
+  // On Android the SDL window dimensions (what SDL_GL_GetDrawableSize returns)
+  // are set from the Java surfaceChanged() callback, which can fire with
+  // portrait dimensions before the activity settles into landscape orientation.
+  // The EGL surface is always created at the correct physical dimensions, so
+  // query it directly to avoid a tiny misplaced viewport on first launch.
+  {
+    EGLDisplay egl_disp = eglGetCurrentDisplay();
+    EGLSurface egl_surf = eglGetCurrentSurface(EGL_DRAW);
+    if (egl_disp != EGL_NO_DISPLAY && egl_surf != EGL_NO_SURFACE) {
+      EGLint egl_w = 0, egl_h = 0;
+      if (eglQuerySurface(egl_disp, egl_surf, EGL_WIDTH, &egl_w) &&
+          eglQuerySurface(egl_disp, egl_surf, EGL_HEIGHT, &egl_h) &&
+          egl_w > 0 && egl_h > 0) {
+        drawable_width = egl_w;
+        drawable_height = egl_h;
+      }
+    }
+  }
+#endif
+
   int viewport_width = drawable_width, viewport_height = drawable_height;
 
   if (!g_config.ignore_aspect_ratio) {
