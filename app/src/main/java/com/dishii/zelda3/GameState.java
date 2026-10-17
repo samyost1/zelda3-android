@@ -68,6 +68,16 @@ public class GameState {
     /** Rebind the 12 joypad commands; applied on the game thread. */
     public static native void setGamepadControls(int[] buttons);
 
+    /** 12 game controls followed by quick save and quick load; -1 means unbound. */
+    public static native void getGamepadBindings(int[] out);
+    public static native void setGamepadBindings(int[] buttons);
+    public static native int getProtectedButtons();
+    public static native void blockGamepadForDialog(boolean block);
+    /** slot in high bits, result in low byte: 1 saved, 2 loaded, 3 empty, 4 error. */
+    public static native int pollStateResult();
+    public static native boolean takeStateThumbnailWithId(int[] pixels, int[] slotAndGeneration);
+    public static native boolean commitStateThumbnail(int slot, int generation, byte[] png);
+
     // Gamepad button names by index, matching the native kGamepadBtn enum; the
     // ini names are what config.c's ParseGamepadButtonName accepts.
     public static final String[] PAD_BUTTON_INI = {

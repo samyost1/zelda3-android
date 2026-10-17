@@ -18,8 +18,9 @@ import java.util.List;
 // per-language alphabet tables are needed here — any hack of the US ROM that
 // keeps the stock text engine layout works, even ones upstream doesn't know.
 //
-// Not supported: the official PAL ROMs (de/fr/fr-c/en) which use a different
-// base ROM and text encoding, and the pt-br hack which remaps the font.
+// PT-BR has a separate conversion below: its escaped characters, commands and
+// remapped font must be normalized to the engine's alternative text encoding.
+// Not supported: the official PAL ROMs (de/fr/fr-c/en).
 final class TranslationExtractor {
 
     // Thrown with a human-readable reason so the setup screen can show it.
@@ -33,12 +34,24 @@ final class TranslationExtractor {
         final String displayName;  // for setup screen messages
         final byte[] dialogueBlk;  // packed [dictionary, messages] (kDialogue entry)
         final byte[] fontBlk;      // packed [font gfx, width table] (kDialogueFont entry)
+        final int flags;
+        final byte[] uiBlk;        // optional, versioned interface resources
 
         Language(String code, String displayName, byte[] dialogueBlk, byte[] fontBlk) {
+            this(code, displayName, dialogueBlk, fontBlk, 2);
+        }
+
+        Language(String code, String displayName, byte[] dialogueBlk, byte[] fontBlk, int flags) {
+            this(code, displayName, dialogueBlk, fontBlk, flags, null);
+        }
+
+        Language(String code, String displayName, byte[] dialogueBlk, byte[] fontBlk, int flags, byte[] uiBlk) {
             this.code = code;
             this.displayName = displayName;
             this.dialogueBlk = dialogueBlk;
             this.fontBlk = fontBlk;
+            this.flags = flags;
+            this.uiBlk = uiBlk;
         }
     }
 
@@ -61,6 +74,14 @@ final class TranslationExtractor {
     private static final int FONT_GFX_SIZE = 0x1000;
     private static final int FONT_WIDTHS = 0x74ADF;
     private static final int FONT_WIDTHS_COUNT = 99;
+    private static final String PT_BR_SHA1 = "D0D09ED41F9C373FE6AFDCCAFBF0DA8C88D3D90D";
+    private static final int PT_FONT_MAP = 0x77C09; // SNES $8E:FC09, 121 [top, bottom, width] records
+    private static final int PT_CHARACTERS = 121;
+    private static final int PT_MESSAGES = 397;
+
+    static boolean isPtBrRom(byte[] rom) {
+        return rom.length == 2097152 && PT_BR_SHA1.equals(sha1Hex(rom));
+    }
 
     // Extra bytes following each command byte 0x67..0x7F (mirrors
     // kText_CommandLengths_US in messaging.c).
@@ -94,7 +115,6 @@ final class TranslationExtractor {
         { "229364A1B92A05167CD38609B1AA98F7041987CC", "the French PAL ROM" },
         { "C1C6C7F76FFF936C534FF11F87A54162FC0AA100", "the French-Canadian PAL ROM" },
         { "7C073A222569B9B8E8CA5FCB5DFEC3B5E31DA895", "the European PAL ROM" },
-        { "D0D09ED41F9C373FE6AFDCCAFBF0DA8C88D3D90D", "the Portuguese translation" },
     };
 
     /**
@@ -108,6 +128,8 @@ final class TranslationExtractor {
                     + "unheadered US ROM (1,048,576 bytes), optionally patched with a translation.");
 
         String sha1 = sha1Hex(rom);
+        if (PT_BR_SHA1.equals(sha1))
+            return extractPtBr(rom);
         for (String[] entry : UNSUPPORTED_ROMS) {
             if (entry[0].equals(sha1))
                 throw new RomException("This looks like " + entry[1]
@@ -136,6 +158,126 @@ final class TranslationExtractor {
         byte[] fontBlk = pack(twoBlocks(fontGfx, widths));
 
         return new Language(code, displayName, dialogueBlk, fontBlk);
+    }
+
+    // Matches snesrev/zelda3 assets/text_compression.py (LangPT/new_encoder)
+    // and assets/sprite_sheets.py (get_pt_remapper). No alphabet or game text
+    // is embedded: every character and dictionary word comes from the ROM.
+    private static Language extractPtBr(byte[] rom) throws RomException {
+        List<byte[]> messages = new ArrayList<byte[]>(PT_MESSAGES);
+        List<Byte> cur = new ArrayList<Byte>();
+        int p = TEXT_BANK1, switches = 0;
+        for (int guard = 0; messages.size() < PT_MESSAGES; guard++) {
+            if (guard > 0x20000 || p >= ROM_SIZE)
+                throw new RomException("Couldn't read the Portuguese dialogue.");
+            int c = rom[p++] & 255;
+            if (c == 0x7f) {
+                messages.add(toArray(cur));
+                cur.clear();
+            } else if (c == 0x62) {
+                if (p >= ROM_SIZE || (rom[p] & 255) >= PT_CHARACTERS)
+                    throw new RomException("Invalid Portuguese character escape.");
+                cur.add(rom[p++]);
+            } else if (c < 0x67) {
+                cur.add((byte) c);
+            } else if (c < 0x7f) {
+                int param = 0;
+                if (CMD_ARG_BYTES[c - 0x67] != 0) {
+                    if (p >= ROM_SIZE)
+                        throw new RomException("Incomplete Portuguese text command.");
+                    param = rom[p++] & 255;
+                }
+                appendPtCommand(cur, c, param);
+            } else if (c == 0x80) {
+                if (++switches > 1)
+                    throw new RomException("Invalid Portuguese text bank switch.");
+                p = TEXT_BANK2;
+                cur.clear();
+            } else if (c >= 0x88 && c < 0x88 + 97) {
+                cur.add((byte) c); // dictionary references keep the same base
+            } else if (c < 0x81 || c >= 0x88) {
+                throw new RomException("Unexpected end of Portuguese dialogue.");
+            }
+            // 0x81..0x87 are ignored by the upstream PT decoder (one 0x85 occurs).
+        }
+
+        List<byte[]> dictionary = extractDictionary(rom);
+        if (dictionary.size() != 97)
+            throw new RomException("Invalid Portuguese text dictionary.");
+        for (int i = 0; i < dictionary.size(); i++) {
+            byte[] word = dictionary.get(i);
+            List<Byte> decoded = new ArrayList<Byte>();
+            for (int j = 0; j < word.length; j++) {
+                int c = word[j] & 255;
+                if (c == 0x62) {
+                    if (++j == word.length)
+                        throw new RomException("Incomplete Portuguese dictionary escape.");
+                    c = word[j] & 255;
+                }
+                if (c >= PT_CHARACTERS)
+                    throw new RomException("Invalid Portuguese dictionary character.");
+                decoded.add((byte) c);
+            }
+            dictionary.set(i, toArray(decoded));
+        }
+
+        byte[] font = new byte[FONT_GFX_SIZE];
+        System.arraycopy(rom, FONT_GFX, font, 0, font.length);
+        byte[] widths = new byte[PT_CHARACTERS];
+        for (int i = 0; i < PT_CHARACTERS; i++) {
+            int top = rom[PT_FONT_MAP + i * 3] & 255;
+            int bottom = rom[PT_FONT_MAP + i * 3 + 1] & 255;
+            int slot = (i & 15) | ((i << 1) & 0xe0);
+            System.arraycopy(rom, FONT_GFX + top * 16, font, slot * 16, 16);
+            System.arraycopy(rom, FONT_GFX + bottom * 16, font, (slot | 16) * 16, 16);
+            widths[i] = rom[PT_FONT_MAP + i * 3 + 2];
+            if (widths[i] < 1 || widths[i] > 8)
+                throw new RomException("Invalid Portuguese font width.");
+        }
+        return new Language("pt-br", "the Portuguese (Brazil) translation",
+                pack(twoBlocks(pack(dictionary), pack(messages))), pack(twoBlocks(font, widths)), 3,
+                UiTranslationPackage.extract(rom));
+    }
+
+    private static void appendPtCommand(List<Byte> out, int c, int param) throws RomException {
+        int simple = -1, extended = -1;
+        switch (c) {
+        case 0x67: extended = 0x85; break; // NextPic
+        case 0x68: extended = 0x80; break; // Choose
+        case 0x69: extended = 0x84; break; // Item
+        case 0x6a: simple = 0x85; break;   // Name
+        case 0x6b: // Window
+            if (param == 0) return;
+            if (param == 2) extended = 0x86;
+            break;
+        case 0x6c: if (param < 16) extended = 0x20 | param; break; // Number
+        case 0x6d: if (param < 2) extended = 0x87 + param; break; // Position
+        case 0x6e: if (param == 0) return; break; // ScrollSpd (upstream omits zero)
+        case 0x6f: extended = 0x83; break; // Selchg
+        case 0x71: extended = 0x82; break; // Choose3
+        case 0x72: extended = 0x81; break; // Choose2
+        case 0x73: simple = 0x80; break; // Scroll
+        case 0x74: simple = 0x82; break; // line 1
+        case 0x75: simple = 0x83; break; // line 2
+        case 0x76: simple = 0x84; break; // line 3
+        case 0x77: if (param < 16) extended = 0x10 | param; break; // Color
+        case 0x78: if (param < 16) extended = param; break; // Wait
+        case 0x79:
+            if (param == 64) return; // unused PT sound, omitted by upstream
+            if (param == 45) extended = 0x40;
+            break;
+        case 0x7a: if (param < 16) extended = 0x30 | param; break; // Speed
+        case 0x7e: simple = 0x81; break; // Waitkey
+        default: break;
+        }
+        if (simple >= 0) {
+            out.add((byte) simple);
+        } else if (extended >= 0) {
+            out.add((byte) 0x87);
+            out.add((byte) extended);
+        } else {
+            throw new RomException("Unsupported Portuguese text command.");
+        }
     }
 
     // Walk the message data exactly like the game's text engine: honor command
@@ -229,16 +371,18 @@ final class TranslationExtractor {
         dialogues.add(lang.dialogueBlk);
         fonts.add(lang.fontBlk);
         // Name -> [dialogue index, font index, flags]; flag 2 marks a language
-        // whose text no longer matches the US ROM (disables the emu-compare
-        // path), flag 1 would mean PAL command encoding which we never emit.
-        byte[] conf = { (byte) idx, (byte) idx, 2 };
+        // whose text no longer matches the US ROM; flag 1 selects the engine's
+        // alternative command encoding, also used by normalized PT-BR text.
+        byte[] conf = { (byte) idx, (byte) idx, (byte) lang.flags };
         byte[] nameBytes;
         try {
             nameBytes = lang.code.getBytes("UTF-8");
         } catch (java.io.UnsupportedEncodingException e) {
             nameBytes = lang.code.getBytes();
         }
-        map.add(pack(twoBlocks(nameBytes, conf)));
+        List<byte[]> languageEntry = twoBlocks(nameBytes, conf);
+        if (lang.uiBlk != null) languageEntry.add(lang.uiBlk);
+        map.add(pack(languageEntry));
         assets[94] = pack(dialogues);
         assets[95] = pack(fonts);
         assets[96] = pack(map);

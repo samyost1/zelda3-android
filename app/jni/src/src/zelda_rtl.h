@@ -98,3 +98,6 @@ enum {
 };
 
 #endif  // ZELDA3_ZELDA_RTL_H_
+
+bool GetStatePath(int slot, const char *suffix, char *out, size_t size);
+int SaveLoadSlotChecked(int cmd, int slot);

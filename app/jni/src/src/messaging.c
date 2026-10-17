@@ -545,25 +545,29 @@ void Animate_GAMEOVER_Letters() {  // 88f4ca
 }
 
 void GameOverText_SweepLeft() {  // 88f4f6
-  static const uint8 kGameOverText_Tab1[8] = {0x40, 0x50, 0x60, 0x70, 0x88, 0x98, 0xa8, 0x40};
+  static const uint8 kGameOverText_Tab1_US[8] = {0x40, 0x50, 0x60, 0x70, 0x88, 0x98, 0xa8, 0x40};
+  const uint8 *kGameOverText_Tab1 = UiTranslation_Get(kUi_GameOverSweep, kGameOverText_Tab1_US);
+  int last = UiTranslation_Active() ? 8 : 7;
 
   int k = flag_for_boomerang_in_place;
+  if (k > last) flag_for_boomerang_in_place = k = last;
+  if (hookshot_effect_index > last - 1) hookshot_effect_index = last - 1;
   cur_object_index = k;
   ancilla_x_vel[k] = 0x80;
   Ancilla_MoveX(k);
   if (Ancilla_GetX(k) < kGameOverText_Tab1[k]) {
     ancilla_x_lo[k] = kGameOverText_Tab1[k];
     flag_for_boomerang_in_place = ++k;
-    if (k == 8) {
-      flag_for_boomerang_in_place = 7;
+    if (k == last + 1) {
+      flag_for_boomerang_in_place = last;
       ancilla_type[0]++;
       hookshot_effect_index = 0;
       sound_effect_2 = 38;
       goto draw;
     }
   }
-  if (k == 7) {
-    int j = 6;
+  if (k == last) {
+    int j = last - 1;
     while (j != hookshot_effect_index)
       ancilla_x_lo[j--] = ancilla_x_lo[k];
     if (Ancilla_GetX(k) < kGameOverText_Tab1[hookshot_effect_index])
@@ -574,16 +578,28 @@ draw:
 }
 
 void GameOverText_UnfurlRight() {  // 88f56d
-  static const uint8 kGameOverText_Tab2[8] = {0x58, 0x60, 0x68, 0x70, 0x88, 0x90, 0x98, 0xa0};
+  static const uint8 kGameOverText_Tab2_US[8] = {0x58, 0x60, 0x68, 0x70, 0x88, 0x90, 0x98, 0xa0};
+  const uint8 *kGameOverText_Tab2 = UiTranslation_Get(kUi_GameOverUnfurl, kGameOverText_Tab2_US);
+  int last = UiTranslation_Active() ? 8 : 7;
 
   int k = flag_for_boomerang_in_place, end;
+  // Old snapshots may have the other layout's leading letter. Grow/shrink
+  // the animation before using its count as the backwards-copy loop bound.
+  if (k != last) {
+    if (k < 10) {
+      ancilla_x_lo[last] = ancilla_x_lo[k];
+      ancilla_x_hi[last] = ancilla_x_hi[k];
+    }
+    flag_for_boomerang_in_place = k = last;
+  }
+  if (hookshot_effect_index > last) hookshot_effect_index = last;
   cur_object_index = k;
   ancilla_x_vel[k] = 0x60;
   Ancilla_MoveX(k);
   int j = hookshot_effect_index;
   if (ancilla_x_lo[k] >= kGameOverText_Tab2[j]) {
     ancilla_x_lo[j] = kGameOverText_Tab2[j];
-    if (++hookshot_effect_index == 8) {
+    if (++hookshot_effect_index == last + 1) {
       submodule_index++;
       ancilla_type[0]++;
       goto draw;
@@ -2081,7 +2097,7 @@ void ToggleStarTilesAndAdvance() {  // 8aefc9
 
 void Death_InitializeGameOverLetters() {  // 8afe20
   flag_for_boomerang_in_place = 0;
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < (UiTranslation_Active() ? 9 : 8); i++) {
     ancilla_x_lo[i] = 0xb0;
     ancilla_x_hi[i] = 0;
   }

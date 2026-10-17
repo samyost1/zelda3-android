@@ -166,3 +166,5 @@ void Palette_LoadAgahnim();
 void HandleScreenFlash();
 
 #endif // ZELDA3_LOAD_GFX_H_
+
+void UiTranslation_LoadHudGraphics(void);

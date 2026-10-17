@@ -143,3 +143,43 @@ JNIEXPORT void JNICALL Java_com_dishii_zelda3_GameState_setGamepadControls(JNIEn
   for (int i = 0; i < 12; i++) tmp[i] = buf[i];
   SS_SetGamepadControls(tmp);
 }
+
+void SS_GetGamepadBindings(int *out);
+void SS_SetGamepadBindings(const int *in);
+int SS_GetProtectedButtons(void);
+int SS_PollStateResult(void);
+bool SS_TakeStateThumbnail(uint32 *out, int *meta);
+bool SS_CommitThumbnail(int slot, int generation, const void *data, int size);
+JNIEXPORT void JNICALL Java_com_dishii_zelda3_GameState_getGamepadBindings(JNIEnv *env, jclass clazz, jintArray out) {
+  if ((*env)->GetArrayLength(env, out) < 14) return;
+  int tmp[14]; SS_GetGamepadBindings(tmp);
+  (*env)->SetIntArrayRegion(env, out, 0, 14, (jint *)tmp);
+}
+JNIEXPORT void JNICALL Java_com_dishii_zelda3_GameState_setGamepadBindings(JNIEnv *env, jclass clazz, jintArray in) {
+  if ((*env)->GetArrayLength(env, in) < 14) return;
+  jint tmp[14]; (*env)->GetIntArrayRegion(env, in, 0, 14, tmp);
+  SS_SetGamepadBindings((int *)tmp);
+}
+JNIEXPORT jint JNICALL Java_com_dishii_zelda3_GameState_getProtectedButtons(JNIEnv *env, jclass clazz) { return SS_GetProtectedButtons(); }
+JNIEXPORT jint JNICALL Java_com_dishii_zelda3_GameState_pollStateResult(JNIEnv *env, jclass clazz) { return SS_PollStateResult(); }
+JNIEXPORT jboolean JNICALL Java_com_dishii_zelda3_GameState_takeStateThumbnailWithId(JNIEnv *env, jclass clazz, jintArray out, jintArray meta) {
+  if ((*env)->GetArrayLength(env, out) < 128 * 112 || (*env)->GetArrayLength(env, meta) < 2) return false;
+  int id[2];
+  if (!SS_TakeStateThumbnail(g_jni_px, id)) return false;
+  (*env)->SetIntArrayRegion(env, out, 0, 128 * 112, (jint *)g_jni_px);
+  (*env)->SetIntArrayRegion(env, meta, 0, 2, (jint *)id);
+  return true;
+}
+JNIEXPORT jboolean JNICALL Java_com_dishii_zelda3_GameState_commitStateThumbnail(JNIEnv *env, jclass clazz, jint slot, jint generation, jbyteArray png) {
+  jsize size = (*env)->GetArrayLength(env, png);
+  jbyte *bytes = (*env)->GetByteArrayElements(env, png, NULL);
+  if (!bytes) return false;
+  bool ok = SS_CommitThumbnail(slot, generation, bytes, size);
+  (*env)->ReleaseByteArrayElements(env, png, bytes, JNI_ABORT);
+  return ok;
+}
+
+JNIEXPORT void JNICALL Java_com_dishii_zelda3_GameState_blockGamepadForDialog(JNIEnv *env, jclass clazz, jboolean block) {
+  extern volatile int g_ss_capture_button;
+  g_ss_capture_button = block ? -3 : -1;
+}

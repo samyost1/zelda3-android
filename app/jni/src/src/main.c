@@ -28,6 +28,7 @@
 #include "util.h"
 #include "audio.h"
 #include "android_logging.h"
+#include "android_autosave.h"
 
 static bool g_run_without_emu = 0;
 
@@ -66,6 +67,7 @@ static SDL_Window *g_window;
 static uint8 g_paused, g_turbo, g_replay_turbo = true, g_cursor = true;
 static uint8 g_current_window_scale;
 static uint8 g_gamepad_buttons;
+static bool g_gamepad_stick_wait_neutral;
 static int g_input1_state;
 static bool g_display_perf;
 static int g_curr_fps;
@@ -426,6 +428,9 @@ int main(int argc, char** argv) {
   }
 
   ParseConfigFile(config_file);
+#ifdef __ANDROID__
+  AndroidAutosave_Init(g_config.autosave);
+#endif
   LoadAssets();
   LoadLinkGraphics();
 
@@ -538,8 +543,12 @@ int main(int argc, char** argv) {
   uint32 frameCtr = 0;
   bool audiopaused = true;
 
+#ifdef __ANDROID__
+  AndroidAutosave_Handle(kAutosaveStart);
+#else
   if (g_config.autosave)
     HandleCommand(kKeys_Load + 0, true);
+#endif
 
   while(running) {
     while(SDL_PollEvent(&event)) {
@@ -577,6 +586,14 @@ int main(int argc, char** argv) {
       case SDL_KEYUP:
         HandleInput(event.key.keysym.sym, event.key.keysym.mod, false);
         break;
+#ifdef __ANDROID__
+      case SDL_APP_WILLENTERBACKGROUND:
+        AndroidAutosave_Handle(kAutosaveBackground);
+        break;
+      case SDL_APP_DIDENTERFOREGROUND:
+        AndroidAutosave_Handle(kAutosaveForeground);
+        break;
+#endif
       case SDL_QUIT:
         running = false;
         break;
@@ -599,6 +616,12 @@ int main(int argc, char** argv) {
     if (g_input1_state & 0xf0)
       g_gamepad_buttons = 0;
     inputs |= g_gamepad_buttons;
+    extern volatile int g_ss_capture_button;
+    if (g_ss_capture_button != -1) {
+      inputs = 0;
+      if (g_gamepad_buttons) g_gamepad_stick_wait_neutral = true;
+      g_gamepad_buttons = 0;
+    }
 
     extern void SecondScreen_RunFrameHook(void);
     SecondScreen_RunFrameHook();
@@ -642,8 +665,12 @@ int main(int argc, char** argv) {
       }
     }
   }
+#ifdef __ANDROID__
+  AndroidAutosave_Handle(kAutosaveExit);
+#else
   if (g_config.autosave)
     HandleCommand(kKeys_Save + 0, true);
+#endif
 
   // clean sdl
   if (g_config.enable_audio) {
@@ -756,6 +783,12 @@ static void HandleCommand_Locked(uint32 j, bool pressed) {
     SaveLoadSlot(kSaveLoad_Replay, 256 + j - kKeys_ReplayRef);
   } else {
     switch (j) {
+    case kKeys_QuickSave:
+    case kKeys_QuickLoad: {
+      extern void SS_SaveLoadState(bool save);
+      SS_SaveLoadState(j == kKeys_QuickSave);
+      break;
+    }
     case kKeys_CheatLife: PatchCommand('w'); break;
     case kKeys_CheatEquipment: PatchCommand('W'); break;
     case kKeys_CheatKeys: PatchCommand('o'); break;
@@ -834,18 +867,36 @@ static int RemapSdlButton(int button) {
 
 static void HandleGamepadInput(int button, bool pressed) {
   extern volatile int g_ss_capture_button;
-  if (g_ss_capture_button == -2) {
-    if (pressed)
-      g_ss_capture_button = button;
+  static uint32 captured_until_release;
+  static int capture_waiting_release = -1;
+  uint32 bit = 1u << button;
+  // Track held buttons even during capture, so remapping cannot synthesize a press.
+  bool changed = !!(g_gamepad_modifiers & bit) != pressed;
+  if (pressed) g_gamepad_modifiers |= bit;
+  else g_gamepad_modifiers &= ~bit;
+  if (captured_until_release & bit) {
+    if (!pressed) {
+      captured_until_release &= ~bit;
+      if (capture_waiting_release == button) {
+        capture_waiting_release = -1;
+        // Publish after release, before a confirmation dialog can consume the release event.
+        if (g_ss_capture_button == -2) g_ss_capture_button = button;
+      }
+    }
     return;
   }
-  if (!!(g_gamepad_modifiers & (1 << button)) == pressed)
+  if (g_ss_capture_button != -1 && pressed && changed) {
+    // Release any old in-game command before consuming the captured button.
+    if (g_gamepad_last_cmd[button]) HandleCommand(g_gamepad_last_cmd[button], false);
+    g_gamepad_last_cmd[button] = 0;
+    captured_until_release |= bit;
+    if (g_ss_capture_button == -2 && capture_waiting_release < 0) capture_waiting_release = button;
     return;
-  g_gamepad_modifiers ^= 1 << button;
-  if (pressed)
-    g_gamepad_last_cmd[button] = FindCmdForGamepadButton(button, g_gamepad_modifiers);
-  if (g_gamepad_last_cmd[button] != 0)
-    HandleCommand(g_gamepad_last_cmd[button], pressed);
+  }
+  if (!changed) return;
+  if (pressed) g_gamepad_last_cmd[button] = FindCmdForGamepadButton(button, g_gamepad_modifiers);
+  if (g_gamepad_last_cmd[button]) HandleCommand(g_gamepad_last_cmd[button], pressed);
+  if (!pressed) g_gamepad_last_cmd[button] = 0;
 }
 
 static void HandleVolumeAdjustment(int volume_adjustment) {
@@ -892,6 +943,17 @@ static void HandleGamepadAxisInput(int gamepad_id, int axis, int value) {
       last_x = last_y = 0;
     }
     *(axis == SDL_CONTROLLER_AXIS_LEFTX ? &last_x : &last_y) = value;
+    extern volatile int g_ss_capture_button;
+    if (g_ss_capture_button != -1) {
+      g_gamepad_buttons = 0;
+      g_gamepad_stick_wait_neutral = last_x * last_x + last_y * last_y >= 10000 * 10000;
+      return;
+    }
+    if (g_gamepad_stick_wait_neutral) {
+      g_gamepad_buttons = 0;
+      if (last_x * last_x + last_y * last_y < 10000 * 10000) g_gamepad_stick_wait_neutral = false;
+      return;
+    }
     int buttons = 0;
     if (last_x * last_x + last_y * last_y >= 10000 * 10000) {
       // in the non deadzone part, divide the circle into eight 45 degree

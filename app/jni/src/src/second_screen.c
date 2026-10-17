@@ -12,6 +12,7 @@
 #include "load_gfx.h"
 #include "messaging.h"
 #include "config.h"
+#include "android_autosave.h"
 #include "zelda_rtl.h"
 #include "snes/ppu.h"
 #include "second_screen_tables.h"
@@ -138,7 +139,9 @@ static void SS_EnsureTiles(void) {
   static const uint8 kSheets[3] = {0x6a, 0x6b, 0x69};  // same order as tile ids 0x000-0x17F
   uint8 raw[0x1000];
   for (int s = 0; s < 3; s++) {
-    Decompress(raw, kSprGfx(kSheets[s]).ptr);  // HUD sheets are sprite-gfx packs (see Decomp_spr)
+    // Second-screen tables use US tile positions, including its A-Z alphabet.
+    // Translated HUD banks reorder those tiles; keep this cached atlas original.
+    Decompress(raw, FindInAssetArray(64, kSheets[s]).ptr);
     for (int t = 0; t < 128; t++) {
       const uint8 *tp = raw + t * 16;
       uint8 *out = g_ss_tiles + (s * 128 + t) * 64;
@@ -428,11 +431,13 @@ static volatile int g_pending_widescreen = -1;
 static volatile int g_pending_crt_filter = -1;
 static volatile int g_pending_hide_hud = -1;
 static volatile int g_pending_controls_set;
-static uint8 g_pending_controls[12];
-static volatile int g_pending_saveload;  // 0 idle, 1 save, 2 load
+static uint8 g_pending_controls[14];
+static SDL_SpinLock g_state_lock;
 // Save-state slot picker: kSaveLoad_Save/kSaveLoad_Load, -1 when idle.
-static volatile int g_pending_state_cmd = -1;
-static volatile int g_pending_state_slot;
+static int g_state_queue[16], g_state_head, g_state_count;
+static int g_state_result; // slot << 8 | result
+static int g_state_generation[6];
+static int g_thumb_slot, g_thumb_generation;
 // kFeatures0_* bits to set/clear; ZeldaRunFrame latches the result into game ram.
 static volatile uint32 g_pending_features_on, g_pending_features_off;
 // Redraw the top HUD once the changed feature bits have reached game ram.
@@ -494,24 +499,41 @@ void SS_SetFeature(unsigned mask, bool on) {
 
 // Settings-screen save state. Slot 1: slot 0 belongs to the Autosave option,
 // which would overwrite it on exit.
-void SS_SaveLoadState(bool save) { g_pending_saveload = save ? 1 : 2; }
+void SS_RequestSaveState(int slot);
+void SS_RequestLoadState(int slot);
+void SS_SaveLoadState(bool save) {
+  if (save) SS_RequestSaveState(1); else SS_RequestLoadState(1);
+}
 
-void SS_SetAutosave(bool on) { g_config.autosave = on; }
+void SS_SetAutosave(bool on) {
+#ifdef __ANDROID__
+  AndroidAutosave_SetEnabled(on);
+#else
+  g_config.autosave = on;
+#endif
+}
 
 // ---- save states ----
 // The picker drives SaveLoadSlot, which touches audio state, so the request is
 // queued here and applied under the audio lock on the game thread.
 
-void SS_RequestSaveState(int slot) {
-  if (slot < 0 || slot >= 256) return;
-  g_pending_state_slot = slot;
-  g_pending_state_cmd = kSaveLoad_Save;
+static void QueueState(int slot, bool save) {
+  if (slot < 1 || slot > 5) return;
+  SDL_AtomicLock(&g_state_lock);
+  if (g_state_count == 16) g_state_result = (slot << 8) | 4;
+  else {
+    g_state_queue[(g_state_head + g_state_count) % 16] = slot * 2 + (save ? 0 : 1);
+    g_state_count++;
+  }
+  SDL_AtomicUnlock(&g_state_lock);
 }
-
-void SS_RequestLoadState(int slot) {
-  if (slot < 0 || slot >= 256) return;
-  g_pending_state_slot = slot;
-  g_pending_state_cmd = kSaveLoad_Load;
+void SS_RequestSaveState(int slot) { QueueState(slot, true); }
+void SS_RequestLoadState(int slot) { QueueState(slot, false); }
+int SS_PollStateResult(void) {
+  SDL_AtomicLock(&g_state_lock);
+  int result = g_state_result; g_state_result = 0;
+  SDL_AtomicUnlock(&g_state_lock);
+  return result;
 }
 
 // 0 idle, 1 waiting on the renderer, 2 a grabbed frame is sitting in g_ss_thumb.
@@ -522,7 +544,9 @@ static uint32 g_ss_thumb[kSsThumbW * kSsThumbH];
 // Only copies when a save asked for a thumbnail, so the read-back off the
 // renderer's buffer costs nothing on a normal frame.
 void SecondScreen_CaptureFrameHook(const uint8 *px, int pitch, int width, int height) {
-  if (g_ss_thumb_state != 1 || !px || width <= 0 || height <= 0) return;
+  if (!px || width <= 0 || height <= 0) return;
+  SDL_AtomicLock(&g_state_lock);
+  if (g_ss_thumb_state != 1) { SDL_AtomicUnlock(&g_state_lock); return; }
   // Widescreen frames carry extra side space; take the centered 8:7 window so
   // the thumbnail always has the shape of the normal 256x224 picture.
   int cw = height * kSsThumbW / kSsThumbH;
@@ -535,16 +559,39 @@ void SecondScreen_CaptureFrameHook(const uint8 *px, int pitch, int width, int he
       out[x] = row[x0 + x * cw / kSsThumbW] | 0xff000000u;
   }
   g_ss_thumb_state = 2;
+  SDL_AtomicUnlock(&g_state_lock);
 }
 
 // Fills out (kSsThumbW*kSsThumbH ARGB) with the frame grabbed for the last save
 // and clears it; false while none is waiting (same consume pattern as
 // SS_GetCapturedButton).
-bool SS_TakeThumbnail(uint32 *out) {
-  if (g_ss_thumb_state != 2) return false;
+bool SS_TakeStateThumbnail(uint32 *out, int *meta) {
+  SDL_AtomicLock(&g_state_lock);
+  if (g_ss_thumb_state != 2) { SDL_AtomicUnlock(&g_state_lock); return false; }
   memcpy(out, g_ss_thumb, sizeof(g_ss_thumb));
+  meta[0] = g_thumb_slot; meta[1] = g_thumb_generation;
   g_ss_thumb_state = 0;
+  SDL_AtomicUnlock(&g_state_lock);
   return true;
+}
+bool SS_TakeThumbnail(uint32 *out) { int meta[2]; return SS_TakeStateThumbnail(out, meta); }
+
+// Commit only if this PNG still belongs to the latest saved generation of its slot.
+bool SS_CommitThumbnail(int slot, int generation, const void *data, int size) {
+  if (slot < 1 || slot > 5 || size <= 0) return false;
+  SDL_AtomicLock(&g_state_lock);
+  bool ok = generation == g_state_generation[slot];
+  char path[1024], temp[1024];
+  ok = ok && GetStatePath(slot, "png", path, sizeof(path)) && GetStatePath(slot, "png.tmp", temp, sizeof(temp));
+  if (ok) {
+    SDL_RWops *f = SDL_RWFromFile(temp, "wb");
+    ok = f && SDL_RWwrite(f, data, 1, size) == (size_t)size;
+    if (f && SDL_RWclose(f) != 0) ok = false;
+    if (ok) ok = rename(temp, path) == 0;
+    if (!ok) remove(temp);
+  }
+  SDL_AtomicUnlock(&g_state_lock);
+  return ok;
 }
 
 void SS_ArmButtonCapture(bool arm) { g_ss_capture_button = arm ? -2 : -1; }
@@ -552,7 +599,7 @@ void SS_ArmButtonCapture(bool arm) { g_ss_capture_button = arm ? -2 : -1; }
 // Returns the captured gamepad button and rearms idle; -2 still waiting, -1 idle.
 int SS_GetCapturedButton(void) {
   int b = g_ss_capture_button;
-  if (b >= 0) g_ss_capture_button = -1;
+  if (b >= 0) g_ss_capture_button = -3; // Keep blocking until UI assigns or cancels.
   return b;
 }
 
@@ -569,6 +616,27 @@ void SS_SetGamepadControls(const int *in) {
   for (int i = 0; i < 12; i++)
     g_pending_controls[i] = (in[i] >= 0 && in[i] < kGamepadBtn_Count) ? (uint8)in[i] : 0xff;
   g_pending_controls_set = 1;
+}
+
+void SS_GetGamepadBindings(int *out) {
+  uint8 buttons[14];
+  SDL_AtomicLock(&g_state_lock);
+  GamepadMap_GetBindings(buttons);
+  SDL_AtomicUnlock(&g_state_lock);
+  for (int i = 0; i < 14; i++) out[i] = buttons[i] == 0xff ? -1 : buttons[i];
+}
+int SS_GetProtectedButtons(void) {
+  SDL_AtomicLock(&g_state_lock);
+  int mask = GamepadMap_ProtectedButtons();
+  SDL_AtomicUnlock(&g_state_lock);
+  return mask;
+}
+void SS_SetGamepadBindings(const int *in) {
+  SDL_AtomicLock(&g_state_lock);
+  for (int i = 0; i < 14; i++)
+    g_pending_controls[i] = in[i] >= 0 && in[i] < kGamepadBtn_Count ? in[i] : 0xff;
+  g_pending_controls_set = 2;
+  SDL_AtomicUnlock(&g_state_lock);
 }
 
 // Called from the main loop right before ZeldaRunFrame (game thread).
@@ -607,21 +675,33 @@ void SecondScreen_RunFrameHook(void) {
         Hud_Rebuild();
     }
   }
+  SDL_AtomicLock(&g_state_lock);
   if (g_pending_controls_set) {
+    if (g_pending_controls_set == 2) GamepadMap_SetBindings(g_pending_controls);
+    else GamepadMap_SetControls(g_pending_controls);
     g_pending_controls_set = 0;
-    GamepadMap_SetControls(g_pending_controls);
+    if (g_ss_capture_button == -3) g_ss_capture_button = -1;
   }
-  int state_cmd = g_pending_state_cmd;
-  if (state_cmd >= 0) {
-    int which = g_pending_state_slot;
-    g_pending_state_cmd = -1;
-    ZeldaApuLock();   // SaveLoadSlot touches audio state (same as HandleCommand)
-    SaveLoadSlot(state_cmd, which);
+  if (g_state_count) {
+    int request = g_state_queue[g_state_head];
+    g_state_head = (g_state_head + 1) % 16; g_state_count--;
+    int slot = request / 2, cmd = request & 1;
+    ZeldaApuLock();
+    int result = SaveLoadSlotChecked(cmd, slot);
     ZeldaApuUnlock();
-    // grab the frame drawn just after the save for the slot's thumbnail
-    if (state_cmd == kSaveLoad_Save)
+    g_state_result = (slot << 8) | result;
+    if (result == 1) {
+      // An old image must never be presented as the new save's frame.
+      char path[1024];
+      if (GetStatePath(slot, "png", path, sizeof(path))) remove(path);
+      g_thumb_slot = slot; g_thumb_generation = ++g_state_generation[slot];
       g_ss_thumb_state = 1;
+    } else if (result == 2 && g_ss_thumb_state == 1) {
+      // A pending capture from before loading would depict the wrong game state.
+      g_ss_thumb_state = 0;
+    }
   }
+  SDL_AtomicUnlock(&g_state_lock);
   uint32 f_on = g_pending_features_on, f_off = g_pending_features_off;
   if (f_on | f_off) {
     g_pending_features_on &= ~f_on;
@@ -644,14 +724,6 @@ void SecondScreen_RunFrameHook(void) {
     g_ss_hud_refresh = false;
     if (!g_ss_hide_hud && (main_module_index == 7 || main_module_index == 9 || main_module_index == 14))
       Hud_Rebuild();
-  }
-  int sl = g_pending_saveload;
-  if (sl) {
-    g_pending_saveload = 0;
-    // SaveLoadSlot touches the APU; the audio callback must not run meanwhile.
-    ZeldaApuLock();
-    SaveLoadSlot(sl == 1 ? kSaveLoad_Save : kSaveLoad_Load, 1);
-    ZeldaApuUnlock();
   }
   // Only during normal overworld/dungeon gameplay, not in menus or cutscenes.
   bool in_gameplay = (main_module_index == 7 || main_module_index == 9) && submodule_index == 0;

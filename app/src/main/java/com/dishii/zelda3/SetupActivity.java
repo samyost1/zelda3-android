@@ -37,6 +37,7 @@ public class SetupActivity extends Activity {
     private static final String TAG = "Zelda3Setup";
     private static final String ASSETS_DAT = "zelda3_assets.dat";
     private static final String BUNDLED_BPS = "zelda3_assets.bps";
+    private static final String PT_BR_BPS = "zelda3_assets_ptbr.bps";
     private static final int REQUEST_PICK_ROM = 1001;
 
     // A standard headered (.smc) dump is the unheadered ROM plus a 512-byte
@@ -191,8 +192,9 @@ public class SetupActivity extends Activity {
                 + "“The Legend of Zelda: A Link to the Past”.\n\n"
                 + "Select your ROM file below. It's read once to build the game "
                 + "assets — the ROM itself is never copied or kept.\n\n"
-                + "Playing a fan translation? Select the translated ROM first; "
-                + "you'll be asked for the original US ROM afterwards.");
+                + "The supported Brazilian Portuguese translation needs only its "
+                + "translated ROM. For other fan translations, select the translated "
+                + "ROM first; you'll be asked for the original US ROM afterwards.");
         blurb.setTextColor(Color.parseColor("#C8C8D0"));
         blurb.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
         blurb.setGravity(Gravity.CENTER);
@@ -313,9 +315,9 @@ public class SetupActivity extends Activity {
 
     /**
      * Read the ROM, apply the bundled patch, and write out the assets file.
-     * A ROM that isn't the US one is treated as a translation romhack: its
-     * text is stashed and a prompt (the return value, null when the assets
-     * were written) asks for the US ROM, which everything else is built from.
+     * The known PT-BR ROM has its own BPS and supplies everything in one step.
+     * Other translations stash their text and prompt for the US ROM (the
+     * return value; null means the assets were written).
      */
     private String extract(Uri romUri)
             throws IOException, BpsPatcher.BpsException, TranslationExtractor.RomException {
@@ -329,7 +331,10 @@ public class SetupActivity extends Activity {
         rom = stripCopierHeader(rom);
 
         byte[] bps = readAsset(BUNDLED_BPS);
-        if (!BpsPatcher.matchesSource(rom, bps)) {
+        if (TranslationExtractor.isPtBrRom(rom)) {
+            bps = readAsset(PT_BR_BPS);
+            pendingTranslation = TranslationExtractor.extract(rom);
+        } else if (!BpsPatcher.matchesSource(rom, bps)) {
             pendingTranslation = TranslationExtractor.extract(rom);
             return "Found " + pendingTranslation.displayName + ".\n\n"
                     + "Now select your original (unpatched) US ROM so the rest "
@@ -351,14 +356,8 @@ public class SetupActivity extends Activity {
         } finally {
             fos.close();
         }
-        if (!tmp.renameTo(out)) {
-            // renameTo can fail if the target exists on some filesystems.
-            out.delete();
-            if (!tmp.renameTo(out)) {
-                tmp.delete();
-                throw new IOException("couldn't save the assets file");
-            }
-        }
+        // Same directory: publish the whole container in one atomic rename.
+        AssetFileWriter.replace(tmp, out);
         Log.i(TAG, "Wrote " + out + " (" + dat.length + " bytes)");
 
         if (pendingTranslation != null) {
@@ -436,9 +435,9 @@ public class SetupActivity extends Activity {
 
     // Drop a 512-byte SNES copier header if the file carries one.
     private byte[] stripCopierHeader(byte[] rom) {
-        if (rom.length == ROM_SIZE + COPIER_HEADER && (rom.length % 1024) == COPIER_HEADER) {
-            byte[] trimmed = new byte[ROM_SIZE];
-            System.arraycopy(rom, COPIER_HEADER, trimmed, 0, ROM_SIZE);
+        if (rom.length >= ROM_SIZE + COPIER_HEADER && (rom.length % 32768) == COPIER_HEADER) {
+            byte[] trimmed = new byte[rom.length - COPIER_HEADER];
+            System.arraycopy(rom, COPIER_HEADER, trimmed, 0, trimmed.length);
             return trimmed;
         }
         return rom;

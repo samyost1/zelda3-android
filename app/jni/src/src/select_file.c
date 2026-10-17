@@ -1,3 +1,4 @@
+#include "ui_translation.h"
 #include "zelda_rtl.h"
 #include "variables.h"
 #include "load_gfx.h"
@@ -96,9 +97,10 @@ void SelectFile_Func17(int k) {
   uint16 *name = (uint16 *)(sram + kSrmOffs_Name);
   uint16 *dst = vram_upload_data + kSelectFile_DrawName_VramOffs[k] / 2;
   for (int i = 5; i >= 0; i--) {
-    uint16 t = *name++ + 0x1800;
+    uint16 character = *name++;
+    uint16 t = UiTranslation_NameTile(character, false) + 0x1800;
     dst[0] = t;
-    dst[21] = t + 0x10;
+    dst[21] = UiTranslation_NameTile(character, true) + 0x1800;
     dst++;
   }
   int health = sram[kSrmOffs_Health] >> 3;
@@ -413,7 +415,7 @@ void FilePicker_DeleteHeaderStripe() {  // 8cd0c6
 }
 
 void CopyFile_SelectionAndBlinker() {  // 8cd13f
-  static const uint8 kCopyFile_SelectionAndBlinker_Tab[173] = {
+  static const uint8 kCopyFile_SelectionAndBlinker_Tab_US[173] = {
     0x61,    4,    0, 0x15, 0x85, 0x18, 0x26, 0x18,    7, 0x18, 0xaf, 0x18,    2, 0x18,    7, 0x18,
     0x6f, 0x18, 0x86, 0x18, 0xa9, 0x18, 0xa9, 0x18, 0xa9, 0x18, 0x61, 0x24,    0, 0x15, 0x95, 0x18,
     0x36, 0x18, 0x17, 0x18, 0xbf, 0x18, 0x12, 0x18, 0x17, 0x18, 0x7f, 0x18, 0x96, 0x18, 0xa9, 0x18,
@@ -426,6 +428,7 @@ void CopyFile_SelectionAndBlinker() {  // 8cd13f
     0xa9, 0x18, 0xa9, 0x18, 0xa9, 0x18, 0xa9, 0x18, 0x62, 0x47,    0,  0xf, 0xf9, 0x18, 0x91, 0x18,
     0xa9, 0x18, 0xa9, 0x18, 0xa9, 0x18, 0xa9, 0x18, 0xa9, 0x18, 0xa9, 0x18, 0xff,
   };
+  const uint8 *kCopyFile_SelectionAndBlinker_Tab = UiTranslation_Get(kUi_CopyFile_SelectionAndBlinker_Tab, kCopyFile_SelectionAndBlinker_Tab_US);
   static const uint8 kCopyFile_SelectionAndBlinker_Tab1[73] = {
     0x61, 0x67, 0x40,  0xe, 0xa9,    0, 0x61, 0x87, 0x40,  0xe, 0xa9,    0, 0x61, 0xc7, 0x40,  0xe,
     0xa9,    0, 0x61, 0xe7, 0x40,  0xe, 0xa9,    0, 0x11, 0x30,    0,    1, 0x83, 0x35, 0x11, 0x31,
@@ -445,9 +448,10 @@ void CopyFile_SelectionAndBlinker() {  // 8cd13f
       const uint16 *name = (uint16 *)(g_zenv.sram + 0x500 * k + kSrmOffs_Name);
       uint16 *dst = vram_upload_data + kCopyFile_SelectionAndBlinker_Dst[k] / 2;
       for (int i = 0; i != 6; i++) {
-        uint16 t = *name++ + 0x1800;
+        uint16 character = *name++;
+        uint16 t = UiTranslation_NameTile(character, false) + 0x1800;
         dst[0] = t;
-        dst[10] = t + 0x10;
+        dst[10] = UiTranslation_NameTile(character, true) + 0x1800;
         dst++;
       }
     }
@@ -507,7 +511,7 @@ void CopyFile_TargetSelectionAndBlink() {  // 8cd27b
     } while ((t -= 2) >= 0);
   }
 
-  static const uint8 kCopyFile_TargetSelectionAndBlink_Tab0[133] = {
+  static const uint8 kCopyFile_TargetSelectionAndBlink_Tab0_US[133] = {
     0x61, 0x51,    0, 0x15, 0x85, 0x18, 0x23, 0x18,  0xe, 0x18, 0xa9, 0x18, 0x26, 0x18,    7, 0x18,
     0xaf, 0x18,    2, 0x18,    7, 0x18, 0x6f, 0x18, 0x86, 0x18, 0x61, 0x71,    0, 0x15, 0x95, 0x18,
     0x33, 0x18, 0x1e, 0x18, 0xb9, 0x18, 0x36, 0x18, 0x17, 0x18, 0xbf, 0x18, 0x12, 0x18, 0x17, 0x18,
@@ -518,12 +522,14 @@ void CopyFile_TargetSelectionAndBlink() {  // 8cd27b
     0x62, 0x34,    0,  0xf, 0xa9, 0x18, 0x91, 0x18, 0xa9, 0x18, 0xa9, 0x18, 0xa9, 0x18, 0xa9, 0x18,
     0xa9, 0x18, 0xa9, 0x18, 0xff,
   };
-  static const uint8 kCopyFile_TargetSelectionAndBlink_Tab2[49] = {
+  const uint8 *kCopyFile_TargetSelectionAndBlink_Tab0 = UiTranslation_Get(kUi_CopyFile_TargetSelectionAndBlink_Tab0, kCopyFile_TargetSelectionAndBlink_Tab0_US);
+  static const uint8 kCopyFile_TargetSelectionAndBlink_Tab2_US[49] = {
     0x61, 0xb4, 0x40,  0xe, 0xa9,    0, 0x61, 0xd4, 0x40,  0xe, 0xa9,    0, 0x62, 0xc6,    0,  0xd,
        2, 0x18,  0xe, 0x18,  0xf, 0x18, 0x28, 0x18, 0xa9, 0x18,  0xe, 0x18,  0xa, 0x18, 0x62, 0xe6,
        0,  0xd, 0x12, 0x18, 0x1e, 0x18, 0x1f, 0x18, 0x38, 0x18, 0xa9, 0x18, 0x1e, 0x18, 0x1a, 0x18,
     0xff,
   };
+  const uint8 *kCopyFile_TargetSelectionAndBlink_Tab2 = UiTranslation_Get(kUi_CopyFile_TargetSelectionAndBlink_Tab2, kCopyFile_TargetSelectionAndBlink_Tab2_US);
   static const uint8 kCopyFile_TargetSelectionAndBlink_FaerieX[3] = {0x8c, 0x8c, 0x1c};
   static const uint8 kCopyFile_TargetSelectionAndBlink_FaerieY[3] = {0x67, 0x7f, 0xbf};
   static const uint16 kCopyFile_TargetSelectionAndBlink_Dst[2] = {0x38, 0x60};
@@ -535,16 +541,17 @@ void CopyFile_TargetSelectionAndBlink() {  // 8cd27b
       continue;
 
     uint16 *dst = vram_upload_data + kCopyFile_TargetSelectionAndBlink_Dst[j++] / 2;
-    uint16 t = kCopyFile_TargetSelectionAndBlink_Tab1[k];
-    dst[0] = t;
-    dst[10] = t + 0x10;
+    uint16 t = kCopyFile_TargetSelectionAndBlink_Tab1[k] & 0xff;
+    dst[0] = UiTranslation_NameTile(t, false) + 0x1800;
+    dst[10] = UiTranslation_NameTile(t, true) + 0x1800;
     dst += 2;
     if (selectfile_arr1[k]) {
       const uint16 *name = (uint16 *)(g_zenv.sram + 0x500 * k + kSrmOffs_Name);
       for (int i = 0; i != 6; i++) {
-        uint16 t = *name++ + 0x1800;
+        uint16 character = *name++;
+        uint16 t = UiTranslation_NameTile(character, false) + 0x1800;
         dst[0] = t;
-        dst[10] = t + 0x10;
+        dst[10] = UiTranslation_NameTile(character, true) + 0x1800;
         dst++;
       }
     }
@@ -662,7 +669,7 @@ void KILLFile_ChooseTarget() {  // 8cd4ba
     0xa9, 0x18, 0xa9, 0x18, 0xa9, 0x18, 0xa9, 0x18, 0xa9, 0x18, 0xa9, 0x18, 0xa9, 0x18, 0xa9, 0x18,
     0xa9, 0x18, 0xa9, 0x18, 0xa9, 0x18, 0xa9, 0x18, 0xa9, 0x18, 0xa9, 0x18, 0xff,
   };
-  static const uint8 kKILLFile_ChooseTarget_Tab2[101] = {
+  static const uint8 kKILLFile_ChooseTarget_Tab2_US[101] = {
     0x61, 0xa7, 0x40, 0x24, 0xa9,    0, 0x61, 0xc7, 0x40, 0x24, 0xa9,    0, 0x62,    7, 0x40, 0x24,
     0xa9,    0, 0x62, 0x27, 0x40, 0x24, 0xa9,    0, 0x62, 0xc6,    0, 0x21,    4, 0x18, 0x21, 0x18,
        0, 0x18, 0x22, 0x18,    4, 0x18, 0xa9, 0x18, 0x23, 0x18,    7, 0x18, 0xaf, 0x18, 0x22, 0x18,
@@ -671,6 +678,7 @@ void KILLFile_ChooseTarget() {  // 8cd4ba
     0x17, 0x18, 0xbf, 0x18, 0x32, 0x18, 0xa9, 0x18, 0x1f, 0x18, 0x1b, 0x18, 0x10, 0x18, 0x38, 0x18,
     0x14, 0x18, 0x31, 0x18, 0xff,
   };
+  const uint8 *kKILLFile_ChooseTarget_Tab2 = UiTranslation_Get(kUi_KILLFile_ChooseTarget_Tab2, kKILLFile_ChooseTarget_Tab2_US);
   static const uint8 kKILLFile_ChooseTarget_FaerieX[4] = {36, 36, 36, 28};
   static const uint8 kKILLFile_ChooseTarget_FaerieY[4] = {103, 127, 151, 191};
   memcpy(vram_upload_data, kKILLFile_ChooseTarget_Tab, 253);
@@ -919,10 +927,10 @@ void NameFile_DrawSelectedCharacter(int k, uint16 chr) {  // 8cdd30
   uint16 a = kNameFile_DrawSelectedCharacter_Tab[k] | 0x6100;
   dst[0] = swap16(a);
   dst[1] = 0x100;
-  dst[2] = 0x1800 | chr;
+  dst[2] = 0x1800 | UiTranslation_NameTile(chr, false);
   dst[3] = swap16(a + 0x20);
   dst[4] = 0x100;
-  dst[5] = (0x1800 | chr) + 0x10;
+  dst[5] = 0x1800 | UiTranslation_NameTile(chr, true);
   BYTE(dst[6]) = 0xff;
   nmi_load_bg_from_vram = 1;
 }

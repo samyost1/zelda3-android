@@ -34,6 +34,8 @@ enum {
   kKeys_ToggleRenderer,
   kKeys_VolumeUp,
   kKeys_VolumeDown,
+  kKeys_QuickSave,
+  kKeys_QuickLoad,
   kKeys_Total,
 };
 
@@ -111,3 +113,8 @@ int FindCmdForSdlKey(SDL_Keycode code, SDL_Keymod mod);
 int FindCmdForGamepadButton(int button, uint32 modifiers);
 void GamepadMap_GetControls(uint8 *out);
 void GamepadMap_SetControls(const uint8 *btns);
+
+// Android editor: the 12 game commands followed by quick save/load.
+void GamepadMap_GetBindings(uint8 *out);
+void GamepadMap_SetBindings(const uint8 *buttons);
+uint32 GamepadMap_ProtectedButtons(void);

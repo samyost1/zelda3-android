@@ -1,4 +1,5 @@
 #include "zelda_rtl.h"
+#include <errno.h>
 #include "variables.h"
 #include "misc.h"
 #include "load_gfx.h"
@@ -409,6 +410,7 @@ static void LoadSnesState(SaveLoadFunc *func, void *ctx) {
   // Do the actual loading
   ZeldaApuLock();
   InternalSaveLoad(func, ctx);
+  UiTranslation_RestoreAfterLoad();
   memcpy(g_zenv.ram + 0x1DBA0, g_zenv.ram + 0x1b00, 224 * 2); // hdma table was moved
 
   ZeldaRestoreMusicAfterLoad_Locked(false);
@@ -421,6 +423,7 @@ static void SaveSnesState(SaveLoadFunc *func, void *ctx) {
   ZeldaApuLock();
   ZeldaSaveMusicStateToRam_Locked();
   InternalSaveLoad(func, ctx);
+  UiTranslation_RestoreAfterLoad();
   ZeldaApuUnlock();
 }
 
@@ -580,7 +583,7 @@ void StateRecorder_Load(StateRecorder *sr, SDL_RWops *f, bool replay_mode) {
   ByteArray_Destroy(&arr);
 }*/
 
-void StateRecorder_Save(StateRecorder* sr, SDL_RWops* rwops) {
+bool StateRecorder_Save(StateRecorder* sr, SDL_RWops* rwops) {
   uint32 hdr[8] = { 0 };
   ByteArray arr = { 0 };
   SaveSnesState(&saveFunc, &arr);
@@ -600,12 +603,12 @@ void StateRecorder_Save(StateRecorder* sr, SDL_RWops* rwops) {
     hdr[5] |= sr->replay_pos_last_complete << 1;
     hdr[7] = sr->replay_frame_counter;
   }
-  SDL_RWwrite(rwops, hdr, sizeof(hdr), 1);
-  SDL_RWwrite(rwops, sr->log.data, hdr[2], 1);
-  SDL_RWwrite(rwops, sr->base_snapshot.data, sr->base_snapshot.size, 1);
-  SDL_RWwrite(rwops, arr.data, arr.size, 1);
-
+  bool ok = SDL_RWwrite(rwops, hdr, 1, sizeof(hdr)) == sizeof(hdr)
+      && SDL_RWwrite(rwops, sr->log.data, 1, hdr[2]) == hdr[2]
+      && SDL_RWwrite(rwops, sr->base_snapshot.data, 1, sr->base_snapshot.size) == sr->base_snapshot.size
+      && SDL_RWwrite(rwops, arr.data, 1, arr.size) == arr.size;
   ByteArray_Destroy(&arr);
+  return ok;
 }
 
 void StateRecorder_ClearKeyLog(StateRecorder *sr) {
@@ -804,6 +807,7 @@ bool ZeldaRunFrame(int inputs) {
 void ZeldaSetLanguage(const char *language) {
   static const uint8 kDefaultConf[3] = { 0, 0, 0 };
   MemBlk found = { kDefaultConf, 3 };
+  MemBlk interface_package = { NULL, 0 };
   if (language) {
     size_t n = strlen(language);
     for (int i = 0; ; i++) {
@@ -815,6 +819,7 @@ void ZeldaSetLanguage(const char *language) {
       MemBlk name = FindIndexInMemblk(mb, 0);
       if (name.size == n && !memcmp(name.ptr, language, n)) {
         found = FindIndexInMemblk(mb, 1);
+        interface_package = FindIndexInMemblk(mb, 2);
         break;
       }
     }
@@ -822,6 +827,9 @@ void ZeldaSetLanguage(const char *language) {
   g_zenv.dialogue_blk = kDialogue(found.ptr[0]);
   g_zenv.dialogue_font_blk = kDialogueFont(found.ptr[1]);
   g_zenv.dialogue_flags = found.ptr[2];
+  bool ui_active = UiTranslation_Select(language, interface_package);
+  if (language && !strcmp(language, "pt-br"))
+    fprintf(stderr, "PT-BR interface: %s\n", ui_active ? "loaded" : "original (package absent or invalid)");
 }
 
 
@@ -889,6 +897,60 @@ void SaveLoadSlot(int cmd, int which) {
 
     SDL_RWclose(rwops);
   }
+}
+
+// Checked UI path. Keep the existing slot format and leave the old save intact on failure.
+bool GetStatePath(int slot, const char *suffix, char *out, size_t size) {
+  const char *root = ".";
+#ifdef __ANDROID__
+  root = SDL_AndroidGetExternalStoragePath();
+  if (!root) return false;
+#endif
+  int n = snprintf(out, size, "%s/saves/save%d.%s", root, slot, suffix);
+  return n > 0 && (size_t)n < size;
+}
+
+// 1 saved, 2 loaded, 3 empty, 4 error. Caller holds the audio lock.
+int SaveLoadSlotChecked(int cmd, int slot) {
+  char path[1024], temp[1024];
+  if (slot < 0 || slot > 5 || !GetStatePath(slot, "sav", path, sizeof(path))) return 4;
+  if (cmd == kSaveLoad_Save) {
+    if (!GetStatePath(slot, "sav.tmp", temp, sizeof(temp))) return 4;
+    SDL_RWops *f = SDL_RWFromFile(temp, "wb");
+    if (!f) return 4;
+    bool ok = StateRecorder_Save(&state_recorder, f);
+    if (SDL_RWclose(f) != 0) ok = false;
+    if (!ok || rename(temp, path) != 0) { remove(temp); return 4; }
+    return 1;
+  }
+  // Read and validate in memory before touching the live game state.
+  errno = 0;
+  FILE *f = fopen(path, "rb");
+  if (!f) return errno == ENOENT ? 3 : 4;
+  if (fseek(f, 0, SEEK_END) != 0) { fclose(f); return 4; }
+  long size = ftell(f);
+  if (size == 0) { fclose(f); return 3; }
+  if (size < 32 || size > 2147483647L || fseek(f, 0, SEEK_SET) != 0) { fclose(f); return 4; }
+  uint8 *data = malloc(size);
+  if (!data) { fclose(f); return 4; }
+  bool ok = fread(data, 1, size, f) == (size_t)size;
+  fclose(f);
+  if (!ok) { free(data); return 4; }
+  uint32 hdr[8];
+  memcpy(hdr, data, sizeof(hdr));
+  ByteArray snapshot = {0};
+  SaveSnesState(&saveFunc, &snapshot);
+  uint64 expected = 32ull + hdr[2] + hdr[6] + ((hdr[5] & 1) ? hdr[6] : 0);
+  ok = ok && hdr[0] == 1 && hdr[6] == snapshot.size && expected == (uint64)size
+      && (hdr[5] >> 1) <= hdr[2];
+  ByteArray_Destroy(&snapshot);
+  if (ok) {
+    SDL_RWops *mem = SDL_RWFromConstMem(data, size);
+    if (!mem) ok = false;
+    else { StateRecorder_Load(&state_recorder, mem, false); SDL_RWclose(mem); }
+  }
+  free(data);
+  return ok ? 2 : 4;
 }
 
 typedef struct StateRecoderMultiPatch {

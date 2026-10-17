@@ -2523,18 +2523,21 @@ void Credits_AddNextAttribution() {  // 8ebe24
 
   dst[0] = swap16(R16);
   dst[1] = 0x3e40;
-  dst[2] = kEnding_MapData[159];
+  dst[2] = UiTranslation_Active() ? 0x3ca9 : kEnding_MapData[159];
   dst += 3;
 
   if (R18 < 394) {
-    const uint8 *src = &kEnding_Credits_Text[kEnding_Credits_Offs[R18]];
+    const uint8 *text = UiTranslation_Get(kUi_CreditsText, kEnding_Credits_Text);
+    const uint16 *offsets = UiTranslation_Get(kUi_CreditsOffsets, kEnding_Credits_Offs);
+    const uint8 *src = text + offsets[R18];
     if (*src != 0xff) {
       *dst++ = swap16(R16 + *src++);
       int n = *src++;
       *dst++ = swap16(n);
       n = (n + 1) >> 1;
+      uint16 color = UiTranslation_Active() ? *src++ << 8 : 0;
       do {
-        *dst++ = kEnding_MapData[*src++];
+        *dst++ = UiTranslation_Active() ? color | *src++ : kEnding_MapData[*src++];
       } while (--n);
     }
 
@@ -2570,18 +2573,21 @@ void Credits_AddEndingSequenceText() {  // 8ec303
   uint16 *dst = vram_upload_data;
   dst[0] = 0x60;
   dst[1] = 0xfe47;
-  dst[2] = kEnding_MapData[159];
+  dst[2] = UiTranslation_Active() ? 0x3ca9 : kEnding_MapData[159];
   dst += 3;
 
-  const uint8 *curo = &kEnding0_Data[kEnding0_Offs[submodule_index >> 1]];
-  const uint8 *endo = &kEnding0_Data[kEnding0_Offs[(submodule_index >> 1) + 1]];
+  const uint8 *text = UiTranslation_Get(kUi_SceneCaptions, kEnding0_Data);
+  const uint16 *offsets = UiTranslation_Get(kUi_SceneOffsets, kEnding0_Offs);
+  const uint8 *curo = text + offsets[submodule_index >> 1];
+  const uint8 *endo = text + offsets[(submodule_index >> 1) + 1];
   do {
     dst[0] = WORD(curo[0]);
     dst[1] = WORD(curo[2]);
     int m = (dst[1] >> 9) & 0x7f;
     dst += 2, curo += 4;
+    uint16 color = UiTranslation_Active() ? *curo++ << 8 : 0;
     do {
-      *dst++ = kEnding_MapData[*curo++];
+      *dst++ = UiTranslation_Active() ? color | *curo++ : kEnding_MapData[*curo++];
     } while (--m >= 0);
   } while (curo != endo);
 

@@ -156,7 +156,9 @@ typedef struct GamepadMapEnt {
 static uint16 joymap_first[kGamepadBtn_Count];
 static GamepadMapEnt *joymap_ents;
 static int joymap_size;
+static uint16 joymap_free;
 static bool has_joypad_controls;
+static bool has_quick_binding[2];
 
 static int CountBits32(uint32 n) {
   int count = 0;
@@ -166,7 +168,7 @@ static int CountBits32(uint32 n) {
 }
 
 static void GamepadMap_Add(int button, uint32 modifiers, uint16 cmd) {
-  if ((joymap_size & 0xff) == 0) {
+  if (!joymap_free && (joymap_size & 63) == 0) {
     if (joymap_size > 1000)
       Die("Too many joypad keys");
     joymap_ents = realloc(joymap_ents, sizeof(GamepadMapEnt) * (joymap_size + 64));
@@ -177,7 +179,9 @@ static void GamepadMap_Add(int button, uint32 modifiers, uint16 cmd) {
   int cb = CountBits32(modifiers);
   while (*p && cb < CountBits32(joymap_ents[*p - 1].modifiers))
     p = &joymap_ents[*p - 1].next;
-  int i = joymap_size++;
+  int i;
+  if (joymap_free) { i = joymap_free - 1; joymap_free = joymap_ents[i].next; }
+  else i = joymap_size++;
   GamepadMapEnt *ent = &joymap_ents[i];
   ent->modifiers = modifiers;
   ent->cmd = cmd;
@@ -205,15 +209,67 @@ void GamepadMap_SetControls(const uint8 *btns) {
     uint16 *p = &joymap_first[b];
     while (*p) {
       GamepadMapEnt *ent = &joymap_ents[*p - 1];
-      if (ent->cmd >= kKeys_Controls && ent->cmd <= kKeys_Controls_Last)
-        *p = ent->next;
-      else
+      if (ent->modifiers == 0 && ent->cmd >= kKeys_Controls && ent->cmd <= kKeys_Controls_Last) {
+        uint16 removed = *p;
+        *p = ent->next; ent->next = joymap_free; joymap_free = removed;
+      } else
         p = &ent->next;
     }
   }
   for (int i = 0; i < 12; i++)
     if (btns[i] < kGamepadBtn_Count)
       GamepadMap_Add(btns[i], 0, kKeys_Controls + i);
+}
+
+static int EditableGamepadCommand(int index) {
+  return index < 12 ? kKeys_Controls + index : index == 12 ? kKeys_QuickSave : kKeys_QuickLoad;
+}
+
+uint32 GamepadMap_ProtectedButtons(void) {
+  uint32 mask = 0;
+  for (int b = 0; b < kGamepadBtn_Count; b++) {
+    for (int e = joymap_first[b]; e; e = joymap_ents[e - 1].next) {
+      GamepadMapEnt *ent = &joymap_ents[e - 1];
+      bool editable = ent->cmd >= kKeys_Controls && ent->cmd <= kKeys_Controls_Last;
+      editable |= ent->cmd == kKeys_QuickSave || ent->cmd == kKeys_QuickLoad;
+      if (ent->modifiers || !editable) mask |= (1u << b) | ent->modifiers;
+    }
+  }
+  return mask;
+}
+
+void GamepadMap_GetBindings(uint8 *out) {
+  GamepadMap_GetControls(out);
+  out[12] = out[13] = 0xff;
+  for (int b = 0; b < kGamepadBtn_Count; b++)
+    for (int e = joymap_first[b]; e; e = joymap_ents[e - 1].next) {
+      GamepadMapEnt *ent = &joymap_ents[e - 1];
+      if (!ent->modifiers && ent->cmd == kKeys_QuickSave) out[12] = b;
+      if (!ent->modifiers && ent->cmd == kKeys_QuickLoad) out[13] = b;
+    }
+}
+
+void GamepadMap_SetBindings(const uint8 *buttons) {
+  GamepadMap_SetControls(buttons);
+  for (int b = 0; b < kGamepadBtn_Count; b++) {
+    uint16 *p = &joymap_first[b];
+    while (*p) {
+      GamepadMapEnt *ent = &joymap_ents[*p - 1];
+      if (!ent->modifiers && (ent->cmd == kKeys_QuickSave || ent->cmd == kKeys_QuickLoad)) {
+        uint16 removed = *p;
+        *p = ent->next; ent->next = joymap_free; joymap_free = removed;
+      } else p = &ent->next;
+    }
+  }
+  for (int i = 12; i < 14; i++)
+    if (buttons[i] < kGamepadBtn_Count) GamepadMap_Add(buttons[i], 0, EditableGamepadCommand(i));
+}
+
+static bool GamepadButtonUsed(int b) {
+  if (joymap_first[b]) return true;
+  for (int i = 0; i < joymap_size; i++)
+    if (joymap_ents[i].modifiers & (1u << b)) return true;
+  return false;
 }
 
 int FindCmdForGamepadButton(int button, uint32 modifiers) {
@@ -351,6 +407,12 @@ static bool HandleIniConfig(int section, const char *key, char *value) {
       }
     }
   } else if (section == 5) {
+    if (StringEqualsNoCase(key, "QuickSave") || StringEqualsNoCase(key, "QuickLoad")) {
+      int i = StringEqualsNoCase(key, "QuickSave") ? 0 : 1;
+      has_quick_binding[i] = true;  // Includes an explicitly empty binding.
+      ParseGamepadArray(value, i ? kKeys_QuickLoad : kKeys_QuickSave, 1);
+      return true;
+    }
     for (int i = 0; i < countof(kKeyNameId); i++) {
       if (StringEqualsNoCase(key, kKeyNameId[i].name)) {
         if (i == 1)
@@ -563,4 +625,10 @@ void ParseConfigFile(const char *filename) {
       fprintf(stderr, "Warning: Unable to read config file %s\n", filename);
   }
   RegisterDefaultKeys();
+#ifdef __ANDROID__
+  if (!has_quick_binding[0] && !GamepadButtonUsed(kGamepadBtn_R2))
+    GamepadMap_Add(kGamepadBtn_R2, 0, kKeys_QuickSave);
+  if (!has_quick_binding[1] && !GamepadButtonUsed(kGamepadBtn_L2))
+    GamepadMap_Add(kGamepadBtn_L2, 0, kKeys_QuickLoad);
+#endif
 }

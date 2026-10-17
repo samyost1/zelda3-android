@@ -852,6 +852,7 @@ const uint8 *GetSpriteTilesetPacks(int idx) {
 }
 
 void LoadDefaultGraphics() {  // 80e2d0
+  UiTranslation_Resume();
   const uint8 *src = GetCompSpritePtr(0);
 
   uint16 *vram_ptr = &g_zenv.vram[0x4000];
@@ -868,6 +869,12 @@ void LoadDefaultGraphics() {  // 80e2d0
   } while (--num);
 
   // Load 2bpp graphics used for hud
+  DecompAndUpload2bpp(&g_zenv.vram[0x7000], 0x6a);
+  DecompAndUpload2bpp(&g_zenv.vram[0x7400], 0x6b);
+  DecompAndUpload2bpp(&g_zenv.vram[0x7800], 0x69);
+}
+
+void UiTranslation_LoadHudGraphics(void) {
   DecompAndUpload2bpp(&g_zenv.vram[0x7000], 0x6a);
   DecompAndUpload2bpp(&g_zenv.vram[0x7400], 0x6b);
   DecompAndUpload2bpp(&g_zenv.vram[0x7800], 0x69);
@@ -940,7 +947,8 @@ void Graphics_LoadChrHalfSlot() {  // 80e3fa
 }
 
 void TransferFontToVRAM() {  // 80e556
-  memcpy(&g_zenv.vram[0x7000], FindIndexInMemblk(kDialogueFont(0), 0).ptr, 0x800 * sizeof(uint16));
+  memcpy(&g_zenv.vram[0x7000], UiTranslation_Get(kUi_InterfaceFont,
+      FindIndexInMemblk(kDialogueFont(0), 0).ptr), 0x800 * sizeof(uint16));
 }
 
 void Do3To4High(uint16 *vram_ptr, const uint8 *decomp_addr) {  // 80e5af

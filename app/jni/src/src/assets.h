@@ -1,5 +1,6 @@
 #pragma once
 #include "types.h"
+#include "ui_translation.h"
 
 enum {
   kNumberOfAssets = 165
@@ -136,8 +137,8 @@ extern MemBlk FindInAssetArray(int asset, int idx);
 #define kMap32ToMap16_2_SIZE (g_asset_sizes[62])
 #define kMap32ToMap16_3 ((uint8*)g_asset_ptrs[63])
 #define kMap32ToMap16_3_SIZE (g_asset_sizes[63])
-#define kSprGfx(idx) FindInAssetArray(64, idx)
-#define kBgGfx(idx) FindInAssetArray(65, idx)
+#define kSprGfx(idx) UiTranslation_Block(0x100 + (idx), FindInAssetArray(64, idx))
+#define kBgGfx(idx) UiTranslation_Block(0x200 + (idx), FindInAssetArray(65, idx))
 #define kOverworldMapGfx ((uint8*)g_asset_ptrs[66])
 #define kOverworldMapGfx_SIZE (g_asset_sizes[66])
 #define kLightOverworldTilemap ((uint8*)g_asset_ptrs[67])
@@ -199,15 +200,15 @@ extern MemBlk FindInAssetArray(int asset, int idx);
 #define kDialogueMap(idx) FindInAssetArray(96, idx)
 #define kDungMap_FloorLayout(idx) FindInAssetArray(97, idx)
 #define kDungMap_Tiles(idx) FindInAssetArray(98, idx)
-#define kBgTilemap_0 ((uint8*)g_asset_ptrs[99])
+#define kBgTilemap_0 ((uint8*)UiTranslation_Get(867, g_asset_ptrs[99]))
 #define kBgTilemap_0_SIZE (g_asset_sizes[99])
-#define kBgTilemap_1 ((uint8*)g_asset_ptrs[100])
+#define kBgTilemap_1 ((uint8*)UiTranslation_Get(868, g_asset_ptrs[100]))
 #define kBgTilemap_1_SIZE (g_asset_sizes[100])
-#define kBgTilemap_2 ((uint8*)g_asset_ptrs[101])
+#define kBgTilemap_2 ((uint8*)UiTranslation_Get(869, g_asset_ptrs[101]))
 #define kBgTilemap_2_SIZE (g_asset_sizes[101])
-#define kBgTilemap_3 ((uint8*)g_asset_ptrs[102])
+#define kBgTilemap_3 ((uint8*)UiTranslation_Get(870, g_asset_ptrs[102]))
 #define kBgTilemap_3_SIZE (g_asset_sizes[102])
-#define kBgTilemap_4 ((uint8*)g_asset_ptrs[103])
+#define kBgTilemap_4 ((uint8*)UiTranslation_Get(871, g_asset_ptrs[103]))
 #define kBgTilemap_4_SIZE (g_asset_sizes[103])
 #define kBgTilemap_5 ((uint8*)g_asset_ptrs[104])
 #define kBgTilemap_5_SIZE (g_asset_sizes[104])

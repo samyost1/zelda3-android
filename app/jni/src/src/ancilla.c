@@ -1,3 +1,4 @@
+#include "ui_translation.h"
 #include "ancilla.h"
 #include "variables.h"
 #include "sprite.h"
@@ -5526,13 +5527,18 @@ void RevivalFairy_MonitorHP() {  // 88f430
 
 void GameOverText_Draw() {  // 88f5c4
   static const uint8 kGameOverText_Chars[16] = {0x40, 0x50, 0x41, 0x51, 0x42, 0x52, 0x43, 0x53, 0x44, 0x54, 0x45, 0x55, 0x43, 0x53, 0x46, 0x56};
+  const uint16 *translated = UiTranslation_Get(kUi_GameOverCharacters, NULL);
   oam_cur_ptr = 0x800;
   oam_ext_cur_ptr = 0xa20;
   OamEnt *oam = GetOamCurPtr();
   int k = flag_for_boomerang_in_place;
+  int last = translated ? 8 : 7;
+  if (k > last) k = last;
   do {
-    Ancilla_SetOam(oam + 0, Ancilla_GetX(k), 0x57, kGameOverText_Chars[k * 2 + 0], 0x3c, 0);
-    Ancilla_SetOam(oam + 1, Ancilla_GetX(k), 0x5f, kGameOverText_Chars[k * 2 + 1], 0x3c, 0);
+    uint16 top = translated ? translated[k * 2] : 0x3c00 | kGameOverText_Chars[k * 2];
+    uint16 bottom = translated ? translated[k * 2 + 1] : 0x3c00 | kGameOverText_Chars[k * 2 + 1];
+    Ancilla_SetOam(oam + 0, Ancilla_GetX(k), 0x57, top & 255, top >> 8, 0);
+    Ancilla_SetOam(oam + 1, Ancilla_GetX(k), 0x5f, bottom & 255, bottom >> 8, 0);
   } while (oam += 2, --k >= 0);
 }
 

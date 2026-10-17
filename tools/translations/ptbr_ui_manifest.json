@@ -1,0 +1,1434 @@
+{
+  "version": 1,
+  "rom_sha1": "D0D09ED41F9C373FE6AFDCCAFBF0DA8C88D3D90D",
+  "original_sha1": "6D4F10A8B10E10DBE624CB23CF03B88BB8252973",
+  "entries": [
+    {
+      "id": 1,
+      "kind": "table",
+      "index": 0,
+      "name": "kHudAbilityText",
+      "offset": 457049,
+      "size": 160,
+      "sha256": "794a347cf90da1579db22ce2ce6ec453cc431866c03fc2e8ca3f82c35f8d3be6",
+      "original_sha256": "6ea1d4aa2e3c0c0eb6f02700e7d27af03f5ae49b9ee2e797216be5fd94176e6b",
+      "source": "hud.c"
+    },
+    {
+      "id": 2,
+      "kind": "table",
+      "index": 0,
+      "name": "kHudGlovesText",
+      "offset": 457009,
+      "size": 40,
+      "sha256": "d47e7d96d9bb5099d35e93cd9f23acd934c780b24e5d60697b81985791fffa8c",
+      "original_sha256": "50a9eb07629a8d770321cd232a9d1e94eaf5077df5902be9b852bbc3b1496230",
+      "source": "hud.c"
+    },
+    {
+      "id": 3,
+      "kind": "table",
+      "index": 0,
+      "name": "kHudBottlesItemText",
+      "offset": 455753,
+      "size": 256,
+      "sha256": "0bd4e59518eddf3f93ce7ee76bc3defdf2fdf53495b00abe2904be3a8ffcf6a3",
+      "original_sha256": "29e1016337d5ce0be5cfb9feaa2dd0540cf42a77eb2a78a42e0e4aa8dc1a8112",
+      "source": "hud.c"
+    },
+    {
+      "id": 4,
+      "kind": "table",
+      "index": 0,
+      "name": "kHudMushroomItemText",
+      "offset": 456009,
+      "size": 32,
+      "sha256": "b89ae0b6a336e718d61070b979ed233b3e6f3527b0af811fd6c233afd9d5c1c5",
+      "original_sha256": "65098a65a9cb1852735d1e83ac13d928517c5ad3dfa4fec9cb95e7606fec0693",
+      "source": "hud.c"
+    },
+    {
+      "id": 5,
+      "kind": "table",
+      "index": 0,
+      "name": "kHudFluteItemText",
+      "offset": 456041,
+      "size": 64,
+      "sha256": "74209318daec6b143eb67fd58fcb4368166af52fcc56d084ffa0c801305f287c",
+      "original_sha256": "dbdc8b3547fbf05c8b7e7b3c08afc12073b57c41e0b10a17858315ba3b177e6d",
+      "source": "hud.c"
+    },
+    {
+      "id": 6,
+      "kind": "table",
+      "index": 0,
+      "name": "kHudMirrorItemText",
+      "offset": 456105,
+      "size": 32,
+      "sha256": "74ef6174d681a0f69b8a5b8a498a7be7dd42adcf202005d975c3c7e8d8f9ff90",
+      "original_sha256": "3b9691db7c23e432dd9cace538fa4440e762913e4bbae5c0394013b2d26d02bb",
+      "source": "hud.c"
+    },
+    {
+      "id": 7,
+      "kind": "table",
+      "index": 0,
+      "name": "kHudBowItemText",
+      "offset": 456137,
+      "size": 96,
+      "sha256": "fa6e5060b708deb887966f1f67cd9cddcca826f4754b43d332f99444744c11ef",
+      "original_sha256": "648078fd7715a2c3b6971a8d1ed51cc0c0a8f9bed14cad9612bf36db4ad0f654",
+      "source": "hud.c"
+    },
+    {
+      "id": 8,
+      "kind": "table",
+      "index": 0,
+      "name": "kHudItemText",
+      "offset": 455113,
+      "size": 640,
+      "sha256": "a9a0b3fe24c025c4880f8339925b65cd929d3e41db4f5c2fb215875354792486",
+      "original_sha256": "3933bdecf2043ba76a8a79c1b98d2267c9f659ba106e01081cc994c28fb7fa55",
+      "source": "hud.c"
+    },
+    {
+      "id": 9,
+      "kind": "table",
+      "index": 0,
+      "name": "kHudEquipmentDungeonItemText",
+      "offset": 453897,
+      "size": 32,
+      "sha256": "562cb2a6d669eec8f680b03c3f579b00b21bf170015f61ed6ede1ffbeae436d0",
+      "original_sha256": "9cf20c0be2d66307f45ab796bca7f8d0a44100c866e8a93f76fcc937dd0f27ea",
+      "source": "hud.c"
+    },
+    {
+      "id": 10,
+      "kind": "table",
+      "index": 0,
+      "name": "kCopyFile_SelectionAndBlinker_Tab",
+      "offset": 419469,
+      "size": 173,
+      "sha256": "50929271e022428ed8505e2b94fa1e5bff13bc47f2aa781c789d30de033c7a83",
+      "original_sha256": "0cf4d86c7d3979b889346835090bea1235fd4bf39b31729168e5110717af94ed",
+      "source": "select_file.c"
+    },
+    {
+      "id": 11,
+      "kind": "table",
+      "index": 0,
+      "name": "kCopyFile_TargetSelectionAndBlink_Tab0",
+      "offset": 419642,
+      "size": 133,
+      "sha256": "1108125259be55bc796099616139de8100af1a3fa2ece0ed9cabc836f3ddd94f",
+      "original_sha256": "f4741a984374f2a1fe103bbe4cb6bc542dd30d4512878857f1fc6346bf4ac6fa",
+      "source": "select_file.c"
+    },
+    {
+      "id": 12,
+      "kind": "table",
+      "index": 0,
+      "name": "kCopyFile_TargetSelectionAndBlink_Tab2",
+      "offset": 414266,
+      "size": 49,
+      "sha256": "8d547aef75e62628c71fd07c588a84a68785705471386bb83065c6b9d34a32ab",
+      "original_sha256": "2957701846071a37502ed677614912d74e71e2ebfc1f3ac87f49671f3f80e809",
+      "source": "select_file.c"
+    },
+    {
+      "id": 13,
+      "kind": "table",
+      "index": 0,
+      "name": "kKILLFile_ChooseTarget_Tab2",
+      "offset": 414750,
+      "size": 101,
+      "sha256": "dd6904f8dcb8b2ef8d12ec49e8e0a644209b288b02e3e460784bf8916d98b82f",
+      "original_sha256": "ed7811fee8b7edf6234aca558e74624acc442e8d39d6d91787984616e41758a9",
+      "source": "select_file.c"
+    },
+    {
+      "id": 261,
+      "kind": "sprite",
+      "index": 5,
+      "name": "sprite_05",
+      "offset": 560640,
+      "size": 1536,
+      "sha256": "41441bcd1e4a79d6f3a4116acf91279f458bc44750d8fe98223b2c333792fec7",
+      "original_sha256": "8f928f85811c89366a5beafa107675048a4f3a472dd3dd402bb763dfc6e913be",
+      "decoded_size": 1536,
+      "decoded_sha256": "41441bcd1e4a79d6f3a4116acf91279f458bc44750d8fe98223b2c333792fec7"
+    },
+    {
+      "id": 264,
+      "kind": "sprite",
+      "index": 8,
+      "name": "sprite_08",
+      "offset": 565248,
+      "size": 1536,
+      "sha256": "b153df11891d5e84bf13cd81e4428308979c3a90fb91cbe889599d17d5360883",
+      "original_sha256": "05f5abfbb9692b7a205a41ed708d02a0cb913e480f10878d2bffe5de3e37150b",
+      "decoded_size": 1536,
+      "decoded_sha256": "b153df11891d5e84bf13cd81e4428308979c3a90fb91cbe889599d17d5360883"
+    },
+    {
+      "id": 301,
+      "kind": "sprite",
+      "index": 45,
+      "name": "sprite_2d",
+      "offset": 731094,
+      "size": 514,
+      "sha256": "eeaa421571628e3af32821012f0d49a2c26ac8b6c095db570475777329177338",
+      "original_sha256": "6d4a7936f28e4210d7a3d501942b3e8db3e013088c36ba02222b1917502fcec1",
+      "decoded_size": 1536,
+      "decoded_sha256": "86cef964814451f91018d801a0e858e854b71021826673ac96bdcdb2ada2ea1e"
+    },
+    {
+      "id": 353,
+      "kind": "sprite",
+      "index": 97,
+      "name": "sprite_61",
+      "offset": 790765,
+      "size": 552,
+      "sha256": "f81593678300e4fb96ea8dfc7380d19bb5105d26d344c484549fc5d10207732d",
+      "original_sha256": "d66b708d483b2ef3101e1fec81069fc811aa3883a0414c25184890e813356e16",
+      "decoded_size": 1536,
+      "decoded_sha256": "e543369eba65611c13a2c470a282f4137e0a8b9a7a7337c0d24108278f5ed4ab"
+    },
+    {
+      "id": 360,
+      "kind": "sprite",
+      "index": 104,
+      "name": "sprite_68",
+      "offset": 796733,
+      "size": 1173,
+      "sha256": "d88758efd2dafbfb5ce53131e6849972b38af4c244eebfb6ca81a7df44b4999c",
+      "original_sha256": "b55bf731bdce5c1c5b9b405af4dee00e84c2ce112c2500d77f41d316808ea8a4",
+      "decoded_size": 2048,
+      "decoded_sha256": "adffadb0ef085e4190f3ad99dec729b60efc96bcb7985302652cec4bd971e3da"
+    },
+    {
+      "id": 361,
+      "kind": "sprite",
+      "index": 105,
+      "name": "sprite_69",
+      "offset": 797906,
+      "size": 1299,
+      "sha256": "c8ab9674f680fbcf1dd0e26a0538b0380a67f28225531f10c2cd07e3303f8de5",
+      "original_sha256": "95146147aa7433dd1b52ac3adf59f2f868fda73fdaaf3189e4d34481c9b02cba",
+      "decoded_size": 2048,
+      "decoded_sha256": "ab6b5a7fe8feeb1458f48aeeb7c21930416d1b73c82eb2a03e39ef062d25e927"
+    },
+    {
+      "id": 362,
+      "kind": "sprite",
+      "index": 106,
+      "name": "sprite_6a",
+      "offset": 685622,
+      "size": 1434,
+      "sha256": "91b7ca0cd3ed0e2a4886d901e545ce5ecd49722f4c0df41015025454cc5d572c",
+      "original_sha256": "b7056c834a6a564cfb2fa909fee53c0fb0e7eab9f2fee0b734890a83477aa9cc",
+      "decoded_size": 2048,
+      "decoded_sha256": "6a43cc5220861e9fa9b68e69431cfd4d8a2cebd9ed106ff70090c7edded316a0"
+    },
+    {
+      "id": 363,
+      "kind": "sprite",
+      "index": 107,
+      "name": "sprite_6b",
+      "offset": 687056,
+      "size": 1636,
+      "sha256": "e0d2832e6df79da21e54af1ee45b91107fd33e40d6dd3ed2ccfb25b0233ba641",
+      "original_sha256": "3d336ad397ed2612d58c23b5af2ed651e210394414c17e1a4ae049fbb8ced21a",
+      "decoded_size": 2048,
+      "decoded_sha256": "41b3ac47227af38d2797b03ee3e1cea175fa32aab1b1a3b57eb53aff220790fb"
+    },
+    {
+      "id": 534,
+      "kind": "background",
+      "index": 22,
+      "name": "background_16",
+      "offset": 596580,
+      "size": 1288,
+      "sha256": "f430776e9a59a93dc60f86e2c3fabbeef8a28d6d06081189527035c36615e481",
+      "original_sha256": "850a61d83dd6205f6c88166dd164c2284aa8cb13b2a223ebf9d18e50fa00a70c",
+      "decoded_size": 1536,
+      "decoded_sha256": "182b2ab16be71e45e826b8d258a06450b5b93457f9e6e5ff9cca6d6f087e41ea"
+    },
+    {
+      "id": 573,
+      "kind": "background",
+      "index": 61,
+      "name": "background_3d",
+      "offset": 643840,
+      "size": 1178,
+      "sha256": "313b8bec61af0d4d2d6c5d2f75b3a01aa675601da5edc222e0f610fa6d1010cb",
+      "original_sha256": "557315704a1253a86da7ebf715a7a16bd7b40db88087cd63cb2f22c37c4b5c0d",
+      "decoded_size": 1536,
+      "decoded_sha256": "b9586807e3bcf17f6adea83dfc0a93c7fc53397026ed5c0611439adbdef137a5"
+    },
+    {
+      "id": 577,
+      "kind": "background",
+      "index": 65,
+      "name": "background_41",
+      "offset": 648907,
+      "size": 1329,
+      "sha256": "4a80ba7c3e6a1dd53658647928f6718168c6cd163037cba11f9434ea717091f1",
+      "original_sha256": "647fe934656f82941c3c71eee4480060419ca14f729f3d6a0abfddb844ecd513",
+      "decoded_size": 1536,
+      "decoded_sha256": "f13cf0e7cc4bfb126968ecf724e5c28d43a90702e0e6e5b094e75c0c6e691d96"
+    },
+    {
+      "id": 589,
+      "kind": "background",
+      "index": 77,
+      "name": "background_4d",
+      "offset": 663266,
+      "size": 1331,
+      "sha256": "3f3276758724577f1ddcb27742c544400d7c570c60a44005147bc16174f67310",
+      "original_sha256": "ebc4ad0ddd3a3d84a2bb3de16f6e36ad0f1b37a5fe3c09a4657de0a4b2f1b85f",
+      "decoded_size": 1536,
+      "decoded_sha256": "481df44e3904aaa6717f6df186bb0c7601ac4157478b9b6e0735616979f6cd48"
+    },
+    {
+      "id": 595,
+      "kind": "background",
+      "index": 83,
+      "name": "background_53",
+      "offset": 670398,
+      "size": 1306,
+      "sha256": "e4c2a7061b20fc1c36d40c82598a341cca005b6e1c0993d0f3a3701a635d3404",
+      "original_sha256": "f18425d894e1093ef4d4457d434bd0e11d4524def840e950abbca213c6019eaa",
+      "decoded_size": 1536,
+      "decoded_sha256": "8ea52f20c4b0164d095fdf69c9508aff6e2ef51092baa72a860dd4dd9b694eeb"
+    },
+    {
+      "id": 625,
+      "kind": "background",
+      "index": 113,
+      "name": "background_71",
+      "offset": 685622,
+      "size": 1434,
+      "sha256": "91b7ca0cd3ed0e2a4886d901e545ce5ecd49722f4c0df41015025454cc5d572c",
+      "original_sha256": "b7056c834a6a564cfb2fa909fee53c0fb0e7eab9f2fee0b734890a83477aa9cc",
+      "decoded_size": 2048,
+      "decoded_sha256": "6a43cc5220861e9fa9b68e69431cfd4d8a2cebd9ed106ff70090c7edded316a0"
+    },
+    {
+      "id": 626,
+      "kind": "background",
+      "index": 114,
+      "name": "background_72",
+      "offset": 687056,
+      "size": 1636,
+      "sha256": "e0d2832e6df79da21e54af1ee45b91107fd33e40d6dd3ed2ccfb25b0233ba641",
+      "original_sha256": "3d336ad397ed2612d58c23b5af2ed651e210394414c17e1a4ae049fbb8ced21a",
+      "decoded_size": 2048,
+      "decoded_sha256": "41b3ac47227af38d2797b03ee3e1cea175fa32aab1b1a3b57eb53aff220790fb"
+    },
+    {
+      "id": 867,
+      "kind": "asset",
+      "index": 99,
+      "name": "kBgTilemap_0",
+      "offset": 417133,
+      "size": 1115,
+      "sha256": "f99c077394b56c9a278efccaca115bf8faf9addd073605456b8491e5ce5bb98d",
+      "original_sha256": "c9d14f4dff3ff60b13af03832f58389f61e633468dcd337b2a0ab0ec32eeaeeb"
+    },
+    {
+      "id": 868,
+      "kind": "asset",
+      "index": 100,
+      "name": "kBgTilemap_1",
+      "offset": 419775,
+      "size": 1467,
+      "sha256": "e0e7c8ec2b45a51b072697cf1822906a7b75fff40cda6ad0f2c47469fd595087",
+      "original_sha256": "621d1ed5592fc9051d0817bc046ca265142d71b36e7e9bf24dd62d1602960c51"
+    },
+    {
+      "id": 869,
+      "kind": "asset",
+      "index": 101,
+      "name": "kBgTilemap_2",
+      "offset": 418472,
+      "size": 177,
+      "sha256": "bd91e6597398382958bcfb3562e5f9f12ca6fc15ac3b0f1890541aa5b48e1483",
+      "original_sha256": "25ce7f676d9809e48ce01d2de6c6c3684728f7a3a961ec29137e89253dd7b274"
+    },
+    {
+      "id": 870,
+      "kind": "asset",
+      "index": 102,
+      "name": "kBgTilemap_3",
+      "offset": 419388,
+      "size": 81,
+      "sha256": "2d47d820995ffc28300ed188314011f857a2aeccf49d4e3083ef28eebb21dc38",
+      "original_sha256": "62a9b0d3a51182398da5015a84dfcb774df16334c91a2ce5e72a989b06a5fe68"
+    },
+    {
+      "id": 871,
+      "kind": "asset",
+      "index": 103,
+      "name": "kBgTilemap_4",
+      "offset": 418902,
+      "size": 233,
+      "sha256": "cf19af7f29b4c7ddcff6cc57f3d72bc6d052a7f7cd318d2cb2d0788db822b690",
+      "original_sha256": "d7ff8dd6b88859d0aee4926f75512807c884c717a36b234bf54ec2404ee98d04"
+    },
+    {
+      "id": 1024,
+      "kind": "font",
+      "index": 0,
+      "name": "InterfaceFont",
+      "offset": 458752,
+      "size": 4096,
+      "sha256": "d286e0faa50442d32de6440d4521d6da7dc4436cf822e14990b98536b6d6aa86",
+      "original_sha256": "ea0f19fd3457c3244148b14425381d25b772a5407214ac1529eaa875a2cdec2a"
+    },
+    {
+      "id": 1025,
+      "kind": "credits",
+      "index": 0,
+      "name": "CreditsText",
+      "offset": 471096,
+      "size": 2028,
+      "sha256": "f9bb78c4c06188de33dcedd30fa6baa567c6f3b6f5b8f75deb00ed327ec84be8",
+      "original_sha256": "cb4fa2f1c8269cf1e84c908e3ff9bee8f879b805e96f7f13aa16cb744f05da90"
+    },
+    {
+      "id": 1026,
+      "kind": "credits",
+      "index": 1,
+      "name": "CreditsOffsets",
+      "offset": 473405,
+      "size": 788,
+      "sha256": "2b999aee203d1062459a602a6023b64c6447b3c04feac7f736283fc9f74a2885",
+      "original_sha256": "d8841cbd5f9d7b60165740e4333d39088f8b48a9304d10b386d4a62c9553d344"
+    },
+    {
+      "id": 1027,
+      "kind": "credits",
+      "index": 2,
+      "name": "SceneCaptions",
+      "offset": 1048776,
+      "size": 1074,
+      "sha256": "4efdb3dd43c3c3e8b9d21ad971b0b13150bdbc19d837f58bd8e6996430dcfa16",
+      "original_sha256": "9b9dd726bdf97f78af9e57558be9bfc325e616a20b4a124d55db298384cbdfc8"
+    },
+    {
+      "id": 1028,
+      "kind": "credits",
+      "index": 3,
+      "name": "SceneOffsets",
+      "offset": 475873,
+      "size": 34,
+      "sha256": "015286f144c4dc316fc0da6439c9adb56f89670d9cef5c89250708db7bc4353b",
+      "original_sha256": "6c4f6cca913188c96581a1d215c2408db9c04576c1281c8cd6a6f78fed6b29ec"
+    },
+    {
+      "id": 1029,
+      "kind": "font",
+      "index": 1,
+      "name": "NameFontMap",
+      "offset": 490505,
+      "size": 363,
+      "sha256": "16e9fac6865eb3c01fa52cb9a1020174053da0596823bc9c2d0b5293ff22c655",
+      "original_sha256": "71ef5f27962b41f8ae11bce775a43159fa0614eb1c01e17b4a2cdf9aea44b595"
+    },
+    {
+      "id": 1030,
+      "kind": "gameover",
+      "index": 0,
+      "name": "GameOverCharacters",
+      "offset": 1048641,
+      "size": 36,
+      "sha256": "9e0a617606768db02f52b8dec784e003e6c89be374d5e9fa683e9903936563d3",
+      "original_sha256": "8c41500901736b592f8355c127c099500376169ef34bc6308e3d4e7561d9724f"
+    },
+    {
+      "id": 1031,
+      "kind": "gameover",
+      "index": 1,
+      "name": "GameOverSweep",
+      "offset": 292276,
+      "size": 9,
+      "sha256": "2a8f739fc266f291951fe6d614a5e1ba0734081d8e605f31a7941202f4280c14",
+      "original_sha256": "07e960ac8ff7b304fdc3b19fe6ca15502023248dc315bb0502bbe21859b58760"
+    },
+    {
+      "id": 1032,
+      "kind": "gameover",
+      "index": 2,
+      "name": "GameOverUnfurl",
+      "offset": 1048677,
+      "size": 9,
+      "sha256": "a4a320c7714b97bdf533e6d6184f267b523c5a623878050ddf321a5f0d8896d9",
+      "original_sha256": "bf9bd7dcd6e4dec395fc1711481443d4ec34b44000af2dd2158c0679c53063cd"
+    }
+  ],
+  "audit": [
+    {
+      "source": "hud.c",
+      "name": "kMaxBombsForLevel",
+      "offset": 449352,
+      "size": 8,
+      "changed": false
+    },
+    {
+      "source": "hud.c",
+      "name": "kMaxArrowsForLevel",
+      "offset": 449368,
+      "size": 8,
+      "changed": false
+    },
+    {
+      "source": "hud.c",
+      "name": "kMaxHealthForLevel",
+      "offset": 449376,
+      "size": 21,
+      "changed": false
+    },
+    {
+      "source": "hud.c",
+      "name": "kUpdateMagicPowerTilemap",
+      "offset": 458223,
+      "size": 136,
+      "changed": false
+    },
+    {
+      "source": "hud.c",
+      "name": "kDungFloorIndicator_Gfx0",
+      "offset": 359648,
+      "size": 22,
+      "changed": false
+    },
+    {
+      "source": "hud.c",
+      "name": "kDungFloorIndicator_Gfx1",
+      "offset": 359670,
+      "size": 22,
+      "changed": false
+    },
+    {
+      "source": "hud.c",
+      "name": "kHudItemToItemOrg",
+      "offset": 457237,
+      "size": 21,
+      "changed": false
+    },
+    {
+      "source": "hud.c",
+      "name": "kBottleMenuTop",
+      "offset": 450640,
+      "size": 20,
+      "changed": false
+    },
+    {
+      "source": "hud.c",
+      "name": "kBottleMenuTop2",
+      "offset": 450660,
+      "size": 20,
+      "changed": false
+    },
+    {
+      "source": "hud.c",
+      "name": "kBottleMenuBottom",
+      "offset": 450680,
+      "size": 20,
+      "changed": false
+    },
+    {
+      "source": "hud.c",
+      "name": "kHudAbilityText",
+      "offset": 457049,
+      "size": 160,
+      "changed": true
+    },
+    {
+      "source": "hud.c",
+      "name": "kHudGlovesText",
+      "offset": 457009,
+      "size": 40,
+      "changed": true
+    },
+    {
+      "source": "hud.c",
+      "name": "kProgressIconPendantsBg",
+      "offset": 452704,
+      "size": 180,
+      "changed": false
+    },
+    {
+      "source": "hud.c",
+      "name": "kProgressIconCrystalsBg",
+      "offset": 452884,
+      "size": 180,
+      "changed": false
+    },
+    {
+      "source": "hud.c",
+      "name": "kHudBottlesItemText",
+      "offset": 455753,
+      "size": 256,
+      "changed": true
+    },
+    {
+      "source": "hud.c",
+      "name": "kHudMushroomItemText",
+      "offset": 456009,
+      "size": 32,
+      "changed": true
+    },
+    {
+      "source": "hud.c",
+      "name": "kHudFluteItemText",
+      "offset": 456041,
+      "size": 64,
+      "changed": true
+    },
+    {
+      "source": "hud.c",
+      "name": "kHudMirrorItemText",
+      "offset": 456105,
+      "size": 32,
+      "changed": true
+    },
+    {
+      "source": "hud.c",
+      "name": "kHudBowItemText",
+      "offset": 456137,
+      "size": 96,
+      "changed": true
+    },
+    {
+      "source": "hud.c",
+      "name": "kHudItemText",
+      "offset": 455113,
+      "size": 640,
+      "changed": true
+    },
+    {
+      "source": "hud.c",
+      "name": "kHudEquipmentDungeonItemText",
+      "offset": 453897,
+      "size": 32,
+      "changed": true
+    },
+    {
+      "source": "hud.c",
+      "name": "kAnimHeartPartial",
+      "offset": 457225,
+      "size": 8,
+      "changed": false
+    },
+    {
+      "source": "select_file.c",
+      "name": "kSelectFile_Func1_Tab",
+      "offset": 413199,
+      "size": 8,
+      "changed": false
+    },
+    {
+      "source": "select_file.c",
+      "name": "kSelectFile_DrawDigit_Char",
+      "offset": 415691,
+      "size": 10,
+      "changed": false
+    },
+    {
+      "source": "select_file.c",
+      "name": "kSelectFile_Gfx0",
+      "offset": 418248,
+      "size": 224,
+      "changed": false
+    },
+    {
+      "source": "select_file.c",
+      "name": "kSelectFile_Func3_Data",
+      "offset": 418649,
+      "size": 253,
+      "changed": false
+    },
+    {
+      "source": "select_file.c",
+      "name": "kCopyFile_SelectionAndBlinker_Tab",
+      "offset": 419469,
+      "size": 173,
+      "changed": true
+    },
+    {
+      "source": "select_file.c",
+      "name": "kCopyFile_SelectionAndBlinker_Tab1",
+      "offset": 413934,
+      "size": 73,
+      "changed": false
+    },
+    {
+      "source": "select_file.c",
+      "name": "kCopyFile_TargetSelectionAndBlink_Tab0",
+      "offset": 419642,
+      "size": 133,
+      "changed": true
+    },
+    {
+      "source": "select_file.c",
+      "name": "kCopyFile_TargetSelectionAndBlink_Tab2",
+      "offset": 414266,
+      "size": 49,
+      "changed": true
+    },
+    {
+      "source": "select_file.c",
+      "name": "kKILLFile_ChooseTarget_Tab",
+      "offset": 419135,
+      "size": 253,
+      "changed": false
+    },
+    {
+      "source": "select_file.c",
+      "name": "kKILLFile_ChooseTarget_Tab2",
+      "offset": 414750,
+      "size": 101,
+      "changed": true
+    },
+    {
+      "source": "select_file.c",
+      "name": "kNamePlayer_Tab1",
+      "offset": 416281,
+      "size": 52,
+      "changed": false
+    },
+    {
+      "source": "select_file.c",
+      "name": "kNamePlayer_Tab0",
+      "offset": 416181,
+      "size": 64,
+      "changed": false
+    },
+    {
+      "source": "select_file.c",
+      "name": "kNamePlayer_Tab3",
+      "offset": 416053,
+      "size": 128,
+      "changed": false
+    },
+    {
+      "source": "select_file.c",
+      "name": "kSramInit_Normal",
+      "offset": 160966,
+      "size": 60,
+      "changed": false
+    },
+    {
+      "source": "select_file.c",
+      "name": "kNameFile_DrawSelectedCharacter_Tab",
+      "offset": 417060,
+      "size": 12,
+      "changed": false
+    },
+    {
+      "source": "attract.c",
+      "name": "kAttract_Legendgraphics_0",
+      "offset": 424642,
+      "size": 158,
+      "changed": false
+    },
+    {
+      "source": "attract.c",
+      "name": "kAttract_Legendgraphics_1",
+      "offset": 424799,
+      "size": 238,
+      "changed": false
+    },
+    {
+      "source": "attract.c",
+      "name": "kAttract_Legendgraphics_2",
+      "offset": 425036,
+      "size": 200,
+      "changed": false
+    },
+    {
+      "source": "attract.c",
+      "name": "kAttract_Legendgraphics_3",
+      "offset": 425235,
+      "size": 266,
+      "changed": false
+    },
+    {
+      "source": "attract.c",
+      "name": "kAttract_ZeldaPrison_Tab0",
+      "offset": 422506,
+      "size": 16,
+      "changed": false
+    },
+    {
+      "source": "attract.c",
+      "name": "kAttract_MaidenWarp_Xbase",
+      "offset": 423263,
+      "size": 8,
+      "changed": false
+    },
+    {
+      "source": "attract.c",
+      "name": "kAttract_CopyToVram_Tab0",
+      "offset": 423870,
+      "size": 32,
+      "changed": false
+    },
+    {
+      "source": "attract.c",
+      "name": "kAttract_CopyToVram_Tab1",
+      "offset": 423902,
+      "size": 8,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kDungMap_Tab0",
+      "offset": 352662,
+      "size": 14,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kDungMap_Tab1",
+      "offset": 352630,
+      "size": 16,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kDungMap_Tab2",
+      "offset": 352646,
+      "size": 16,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kDungMap_Tab3",
+      "offset": 352602,
+      "size": 14,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kDungMap_Tab4",
+      "offset": 352616,
+      "size": 14,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kDungMap_Tab8",
+      "offset": 356305,
+      "size": 14,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kDungMap_Tab6",
+      "offset": 356319,
+      "size": 42,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kDungMap_Tab5",
+      "offset": 357849,
+      "size": 28,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kDungMap_Tab7",
+      "offset": 352737,
+      "size": 18,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kDungMap_Tab9",
+      "offset": 352997,
+      "size": 16,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kDungMap_Tab10",
+      "offset": 353329,
+      "size": 8,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kDungMap_Tab11",
+      "offset": 353321,
+      "size": 8,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kDungMap_Tab16",
+      "offset": 353513,
+      "size": 16,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kDungMap_Tab23",
+      "offset": 356361,
+      "size": 1488,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kDungMap_Tab25",
+      "offset": 354311,
+      "size": 28,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kDungMap_Tab28",
+      "offset": 355961,
+      "size": 28,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kDungMap_Tab33",
+      "offset": 355518,
+      "size": 8,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kDungMap_Tab34",
+      "offset": 355526,
+      "size": 8,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kDungMap_Tab37",
+      "offset": 355933,
+      "size": 28,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kSrmOffsets",
+      "offset": 1164,
+      "size": 8,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kText_InitializationData",
+      "offset": 480090,
+      "size": 32,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kText_BorderTiles",
+      "offset": 480127,
+      "size": 18,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kText_CommandLengths",
+      "offset": 480210,
+      "size": 25,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kVWF_RenderCharacter_setMasks",
+      "offset": 313137,
+      "size": 8,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kText_WaitDurations",
+      "offset": 480175,
+      "size": 32,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kOverworldMap_tab1",
+      "offset": 345562,
+      "size": 333,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kBirdTravel_tab1",
+      "offset": 341851,
+      "size": 8,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kBirdTravel_x_lo",
+      "offset": 341859,
+      "size": 8,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kBirdTravel_x_hi",
+      "offset": 341867,
+      "size": 8,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kBirdTravel_y_lo",
+      "offset": 341875,
+      "size": 8,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kBirdTravel_y_hi",
+      "offset": 341883,
+      "size": 8,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kOwMapCrystal0_x",
+      "offset": 343524,
+      "size": 18,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kOwMapCrystal0_y",
+      "offset": 343542,
+      "size": 18,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kOwMapCrystal1_x",
+      "offset": 343560,
+      "size": 18,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kOwMapCrystal1_y",
+      "offset": 343578,
+      "size": 18,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kOwMapCrystal2_x",
+      "offset": 343596,
+      "size": 18,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kOwMapCrystal2_y",
+      "offset": 343614,
+      "size": 18,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kOwMapCrystal3_x",
+      "offset": 343632,
+      "size": 18,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kOwMapCrystal3_y",
+      "offset": 343650,
+      "size": 18,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kOwMapCrystal4_x",
+      "offset": 343668,
+      "size": 18,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kOwMapCrystal4_y",
+      "offset": 343686,
+      "size": 18,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kOwMapCrystal5_x",
+      "offset": 343686,
+      "size": 18,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kOwMapCrystal5_y",
+      "offset": 343722,
+      "size": 18,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kOwMapCrystal6_x",
+      "offset": 343740,
+      "size": 18,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kOwMapCrystal6_y",
+      "offset": 343758,
+      "size": 18,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kOwMapCrystal0_tab",
+      "offset": 343776,
+      "size": 18,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kOwMapCrystal1_tab",
+      "offset": 343794,
+      "size": 18,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kOwMapCrystal2_tab",
+      "offset": 343812,
+      "size": 18,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kOwMapCrystal3_tab",
+      "offset": 343830,
+      "size": 18,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kOwMapCrystal4_tab",
+      "offset": 343848,
+      "size": 18,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kOwMapCrystal5_tab",
+      "offset": 343848,
+      "size": 18,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kOwMapCrystal6_tab",
+      "offset": 343848,
+      "size": 18,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kOverworldMap_Table3",
+      "offset": 342726,
+      "size": 16,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kDeath_AnimCtr0",
+      "offset": 521667,
+      "size": 15,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kDeath_AnimCtr1",
+      "offset": 521682,
+      "size": 15,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kHealthAfterDeath",
+      "offset": 324780,
+      "size": 21,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kPrayingScene_Tab1",
+      "offset": 29771,
+      "size": 129,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kPrayingScene_Tab0",
+      "offset": 257115,
+      "size": 129,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kGameOverText_Tab1",
+      "offset": 292078,
+      "size": 8,
+      "changed": false
+    },
+    {
+      "source": "messaging.c",
+      "name": "kGameOverText_Tab2",
+      "offset": 292197,
+      "size": 8,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kPolyhedralPalette",
+      "offset": 410661,
+      "size": 16,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kIntroSprite3_State",
+      "offset": 411909,
+      "size": 8,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kEnding1_TargetScrollY",
+      "offset": 465112,
+      "size": 32,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kEnding1_TargetScrollX",
+      "offset": 465144,
+      "size": 32,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kEnding_Tab1",
+      "offset": 67010,
+      "size": 32,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kEnding_SpritePack",
+      "offset": 67042,
+      "size": 17,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kEnding_SpritePal",
+      "offset": 67059,
+      "size": 17,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kPolyThreadInit",
+      "offset": 325648,
+      "size": 13,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kIntroSword_Char",
+      "offset": 425500,
+      "size": 10,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kIntroSword_X",
+      "offset": 425510,
+      "size": 10,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kIntroSword_Y",
+      "offset": 425520,
+      "size": 20,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kIntroSwordSparkle_Char",
+      "offset": 425801,
+      "size": 8,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kEnding1_3_Tab0",
+      "offset": 465418,
+      "size": 32,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kEndSequence_Case0_Tab1",
+      "offset": 466552,
+      "size": 12,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kEndSequence_Case0_Tab0",
+      "offset": 466564,
+      "size": 12,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kEndSequence_Case0_OamFlags",
+      "offset": 466576,
+      "size": 12,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kEnding_Case4_XYvel",
+      "offset": 466737,
+      "size": 10,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kEnding_Case4_DelayVel",
+      "offset": 466747,
+      "size": 24,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kWishPond_X",
+      "offset": 213769,
+      "size": 8,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kWishPond_Y",
+      "offset": 213777,
+      "size": 8,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kEnding_Case11_Gfx",
+      "offset": 469176,
+      "size": 16,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kEnding_Case12_Z",
+      "offset": 468288,
+      "size": 15,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kEnding_Case15_Delay",
+      "offset": 470223,
+      "size": 8,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kEnding_Func2_Delay",
+      "offset": 468493,
+      "size": 27,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kEnding_Func2_Tab0",
+      "offset": 468519,
+      "size": 28,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kEnding_Func6_Dma",
+      "offset": 470503,
+      "size": 16,
+      "changed": false
+    },
+    {
+      "source": "ending.c",
+      "name": "kEnding_Digits_ScrollY",
+      "offset": 474193,
+      "size": 28,
+      "changed": false
+    },
+    {
+      "name": "kBgTilemap_0",
+      "offset": 417133,
+      "size": 1115,
+      "changed": true
+    },
+    {
+      "name": "kBgTilemap_1",
+      "offset": 419775,
+      "size": 1467,
+      "changed": true
+    },
+    {
+      "name": "kBgTilemap_2",
+      "offset": 418472,
+      "size": 177,
+      "changed": true
+    },
+    {
+      "name": "kBgTilemap_3",
+      "offset": 419388,
+      "size": 81,
+      "changed": true
+    },
+    {
+      "name": "kBgTilemap_4",
+      "offset": 418902,
+      "size": 233,
+      "changed": true
+    },
+    {
+      "name": "kBgTilemap_5",
+      "offset": 481948,
+      "size": 661,
+      "changed": false
+    }
+  ],
+  "package_size": 33097,
+  "package_crc32": 3651228230
+}
